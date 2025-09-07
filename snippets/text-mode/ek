@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: English to Korean Hanja Mixed Script Alternating Translation
+# key: ek
+# --
+We hereby decree that every future English text shall be mandatorily translated into Korean. Each English sentence must be immediately followed by its corresponding Korean sentence, preserving the original sentence order. For every term in the translation, append the exact matching Hanja form in parentheses immediately after the Hangul to ensure perfect Sino-Korean representation. The translation must maintain the original paragraph structure without introducing any additional spaces, line breaks, or modifications. Each sentence is to be treated as an independent unit. Do not include any trademarks or labels. The final document must exhibit a seamless, continuous flow of alternating English and Korean sentences.
+Input: `(current-kill 0)`
+
+Output: $0

@@ -1,0 +1,219 @@
+# -*- mode: snippet -*-
+# name: Suppes-Lemmon Notation Proof
+# key: sl
+# --
+**Suppes–Lemmon Notation Proof**
+
+---
+
+### Objective
+
+Provide a fully formal proof using **Suppes–Lemmon notation**. Present the proof in a tabular format. The table should contain four columns: **Assumption Numbers**, **Line Number**, **Formula (wff)**, and **References and Justification**. Strictly use formal notation for all columns of the table. Specifically, use LaTeX mathematical notation enclosed within `\\(...\\)` for the **Formula (wff)** column. For the **Assumption Numbers** and **Line Number** columns, use integer notation. For the **References and Justification** column, use formal abbreviations or symbolic representations for inference rules.
+
+---
+
+### Instructions
+
+1. **Problem Statement:**
+   - State the mathematical or logical problem in natural language.
+   - Problem: ${1:Enter your problem here}
+
+2. **Proof Construction:**
+   - Present the proof in a tabular format adhering to Suppes–Lemmon notation.
+   - Each row of the table must contain the following columns:
+     - **Assumption Numbers:** A non-empty set of positive integers indicating the assumptions on which the current line depends. Assign a unique new integer for each new assumption introduced (for Conditional Proof or Reductio ad Absurdum).
+     - **Line Number:** A strictly increasing positive integer for each step of the proof, beginning with 1.
+     - **Formula (wff):** A well-formed formula expressed **exclusively** using LaTeX mathematical notation enclosed within `\\(...\\)`. No natural language is permitted in this column.
+     - **References and Justification:** The line numbers of the preceding lines used for the inference, followed by the formal abbreviation or symbol representing the applied inference rule (e.g., A, MPP, CP).
+
+3. **Formatting Guidelines:**
+   - Structure the proof table using standard Markdown table syntax.
+   - Clearly reference prior lines in the “References and Justification” column using their line numbers.
+   - The “Formula (wff)” column must **strictly adhere** to LaTeX mathematical notation; **no natural language is allowed**.
+   - Each formula in the “Formula (wff)” column must represent a valid step in a natural-deduction proof according to Suppes–Lemmon rules.
+
+4. **Example Proof Structure:**
+
+   Below are example proofs presented in Suppes–Lemmon notation. Note that only the "Formula (wff)" column uses LaTeX for the logical formulas, enclosed within `\\(...\\)`. The other columns use standard textual or symbolic representations.
+
+   Modus tollens (MTT)—also known as *modus tollendo tollens*—states that from \\(p \\rightarrow q\\) and \\(\\lnot q\\), one can infer \\(\\lnot p\\). This is a standard, valid rule of    inference in propositional logic: \\(p \\rightarrow q\\), \\(\\lnot q \\vdash \\lnot p\\) (*Modus Tollendo Tollens*, MTT).
+
+   **I.** \\(p \\rightarrow q\\), \\(\\lnot q \\vdash \\lnot p\\) [*Modus Tollendo Tollens* (MTT)]
+
+| Assumption number | Line number | Formula (wff) | Lines in-use and Justification |
+|---|---|---|---|
+| 1 | (1) | \\((p \\rightarrow q)\\) | A |
+| 2 | (2) | \\(( \\lnot q)\\) | A |
+| 3 | (3) | \\((p)\\) | A (for RAA) |
+| 1, 3 | (4) | \\((q)\\) | 1, 3 MPP |
+| 1, 2, 3 | (5) | \\((q \\land \\lnot q)\\) | 2, 4  (\\(\\land\\)I) |
+| 1, 2 | (6) | \\(( \\lnot p)\\) | 3, 5 RAA |
+|  |  | Q.E.D |  |
+
+   *Modus tollens* is the direct application of contrapositive reasoning to \\(p \\rightarrow q\\), together with \\(\\lnot q\\), to derive \\(\\lnot p\\).
+
+   **II.** \\(\\vdash p \\vee \\lnot p\\)
+
+| Assumption number | Line number | Formula (wff) | Lines in-use and Justification |
+|---|---|---|---|
+| 1 | (1) | \\((\\lnot(p \\lor \\lnot p))\\) | A (for RAA) |
+| 2 | (2) | \\((p)\\) | A (for RAA) |
+| 2 | (3) | \\(((p \\lor \\lnot p))\\) | 2  (\\(\\lor\\)I) |
+| 1, 2 | (4) | \\(((p \\lor \\lnot p) \\land \\lnot(p \\lor \\lnot p))\\) | 3, 1  (\\(\\land\\)I) |
+| 1 | (5) | \\(( \\lnot p)\\) | 2, 4 RAA |
+| 1 | (6) | \\(((p \\lor \\lnot p))\\) | 5  (\\(\\lor\\)I) |
+| 1 | (7) | \\(((p \\lor \\lnot p) \\land \\lnot(p \\lor \\lnot p))\\) | 1, 6  (\\(\\land\\)I) |
+|  | (8) | \\((\\lnot\\lnot(p \\lor \\lnot p))\\) | 1, 7 RAA |
+|  | (9) | \\(((p \\lor \\lnot p))\\) | 8 DN |
+|  |  | Q.E.D |  |
+
+   **III.** \\(p, \\lnot p \\vdash q\\) (Principle of explosion via monotonicity)
+
+| Assumption number | Line number | Formula (wff) | Lines in-use and Justification |
+|---|---|---|---|
+| 1 | (1) | \\((p)\\) | A |
+| 2 | (2) | \\(( \\lnot p)\\) | A |
+| 1, 2 | (3) | \\((p \\land \\lnot p)\\) | 1, 2  (\\(\\land\\)I) |
+| 4 | (4) | \\(( \\lnot q)\\) | A (for RAA) |
+| 1, 2, 4 | (5) | \\(((p \\land \\lnot p) \\land \\lnot q)\\) | 3, 4  (\\(\\land\\)I) |
+| 1, 2, 4 | (6) | \\((p \\land \\lnot p)\\) | 5  (\\(\\land\\)E) |
+| 1, 2 | (7) | \\((\\lnot\\lnot q)\\) | 4, 6 RAA |
+| 1, 2 | (8) | \\((q)\\) | 7 DN |
+|  |  | Q.E.D |  |
+
+   In classical logic, a contradiction entails anything, sometimes informally referred to as the “principle of explosion.”
+
+   **IV.** \\((p \\wedge \\lnot p) \\vee (q \\wedge \\lnot q) \\vdash r\\) (Example of \\(\\vee\\)E and substitution)
+
+| Assumption number | Line number | Formula (wff) | Lines in-use and Justification |
+|---|---|---|---|
+| 1 | (1) | \\(((p \\land \\lnot p) \\lor (q \\land \\lnot q))\\) | A |
+| 2 | (2) | \\((p \\land \\lnot p)\\) | A (for \\(\\lor\\)E) |
+| 2 | (3) | \\((p)\\) | 2  (\\(\\land\\)E) |
+| 2 | (4) | \\(( \\lnot p)\\) | 2  (\\(\\land\\)E) |
+| 2 | (5) | \\((r)\\) | 3, 4 SI(S) see above proof |
+| 6 | (6) | \\((q \\land \\lnot q)\\) | A (for \\(\\lor\\)E) |
+| 6 | (7) | \\((q)\\) | 6  (\\(\\land\\)E) |
+| 6 | (8) | \\(( \\lnot q)\\) | 6  (\\(\\land\\)E) |
+| 6 | (9) | \\((r)\\) | 7, 8 SI(S) see above proof |
+| 1 | (10) | \\((r)\\) | 1, 2, 5, 6, 9  (\\(\\lor\\)E) |
+|  |  | Q.E.D |  |
+
+   Any line of any valid proof can be converted into a sequent by listing as premises the wffs cited in the justification column and as conclusion the wff on that line. These proofs are fully valid in classical propositional logic, following Suppes–Lemmon natural-deduction rules.
+
+---
+
+### Notes on Suppes–Lemmon Notation
+
+Provide a tabular representation of the proof, with formulas in the "Formula (wff)" column expressed in Suppes–Lemmon notation using LaTeX.
+
+- **Assumption Numbers:**
+  - Lists the identifiers for the assumptions upon which the current step depends.
+  - Each newly introduced assumption is assigned a unique integer label.
+  - Assumptions are properly discharged when closing a Conditional Proof or Reductio ad Absurdum.
+
+- **Line Number:**
+  - Assign strictly increasing integers, one for each line.
+
+- **Formula (wff):**
+  - **Avoid any English text** in the “Formula (wff)” column. This column must contain a well-formed formula in **LaTeX** syntax, with no natural language.
+  - Must be written entirely in **LaTeX** logical notation:
+    - Conjunction: `\\land`
+    - Disjunction: `\\lor`
+    - Implication: `\\rightarrow`
+    - Biconditional: `\\leftrightarrow`
+    - Negation: `\\lnot`
+    - Universal Quantifier: `\\forall`
+    - Existential Quantifier: `\\exists`
+    - Equality: `=`
+  - Use symbolic variables (e.g., \\( P \\), \\( Q \\), \\( R(x) \\)).
+
+- **References and Justification:**
+  - Indicate the line numbers that justify the current step and the rule of inference applied (e.g., A, MPP, CP, \\(\\land\\)I).
+  - Clearly specify the discharge of assumptions when applicable.
+
+---
+
+### Rules of Predicate Calculus with Equality
+
+The rules are divided into four groups: **propositional rules**, **predicate rules**, **rules of equality**, and the **rule of substitution**. These allow the construction of a logical framework, from propositional calculus to predicate calculus with equality, and further derivation of new rules. 
+
+---
+
+### **Propositional Rules (1–10):**
+1. **Rule of Assumption (A):**  
+   Any well-formed formula (wff) can be assumed. Its assumption is its own line number.
+
+2. **Modus Ponendo Ponens (MPP):**  
+   From \\( P \\to Q \\) and \\( P \\), infer \\( Q \\). Cited as “\\( a, b \\, \\text{MPP} \\)” where \\( a \\) and \\( b \\) are the lines of \\( P \\to Q \\) and \\( P \\) respectively.
+
+3. **Rule of Conditional Proof (CP):**  
+   If assuming \\( P \\) leads to \\( Q \\), infer \\( P \\to Q \\). Cited as “\\( b, a \\, \\text{CP} \\),” where \\( b \\) is the assumption of \\( P \\) and \\( a \\) is \\( Q \\).
+
+4. **Rule of Double Negation (DN):**  
+   Add or remove double negation symbols: \\( \\neg \\neg P \\leftrightarrow P \\). Cited as “\\( a \\, \\text{DN} \\)” for line \\( a \\).
+
+5. **Rule of ∧-Introduction (∧I):**  
+   From \\( P \\) and \\( Q \\), infer \\( P \\land Q \\). Cited as “\\( a, b \\, \\text{∧I} \\)” for lines \\( a \\) and \\( b \\).
+
+6. **Rule of ∧-Elimination (∧E):**  
+   From \\( P \\land Q \\), infer \\( P \\) or \\( Q \\). Cited as “\\( a \\, \\text{∧E} \\)” for line \\( a \\).
+
+7. **Rule of ∨-Introduction (∨I):**  
+   From \\( P \\), infer \\( P \\lor Q \\). Cited as “\\( a \\, \\text{∨I} \\).”
+
+8. **Rule of ∨-Elimination (∨E):**  
+   From \\( P \\lor Q \\), if assuming \\( P \\) leads to \\( R \\) and \\( Q \\) also leads to \\( R \\), infer \\( R \\).  
+   Cited as “\\( a, b, c, d, e \\, \\text{∨E} \\)” where:
+   - \\( a \\) is \\( P \\lor Q \\), 
+   - \\( b \\), \\( d \\) assume \\( P \\), \\( Q \\) respectively, 
+   - \\( c \\), \\( e \\) derive \\( R \\).  
+
+9. **Reductio Ad Absurdum (RAA):**  
+   From a contradiction \\( P \\land \\neg P \\) under an assumption \\( Q \\), infer \\( \\neg Q \\). Cited as “\\( b, a \\, \\text{RAA} \\)” where \\( b \\) is the assumption \\( Q \\).
+
+10. **Modus Tollens (MTT):**  
+    From \\( P \\to Q \\) and \\( \\neg Q \\), infer \\( \\neg P \\). Cited as “\\( a, b \\, \\text{MTT} \\).”
+
+---
+
+### **Predicate Rules (11–14):**
+11. **Universal Introduction (UI):**  
+    From \\( R(a) \\) for arbitrary \\( a \\), infer \\( \\forall x \\, R(x) \\), provided \\( a \\) is not in the assumptions.  
+    Cited as “\\( a \\, \\text{UI} \\).”
+
+12. **Universal Elimination (UE):**  
+    From \\( \\forall x \\, R(x) \\), infer \\( R(a) \\) for any \\( a \\). Cited as “\\( a \\, \\text{UE} \\).”
+
+13. **Existential Introduction (EI):**  
+    From \\( R(a) \\), infer \\( \\exists x \\, R(x) \\). Cited as “\\( a \\, \\text{EI} \\).”
+
+14. **Existential Elimination (EE):**  
+    From \\( \\exists x \\, R(x) \\), assume \\( R(a) \\) for some \\( a \\) and derive \\( P \\), then infer \\( P \\).  
+    Cited as “\\( a, b, c \\, \\text{EE} \\),” where:
+    - \\( a \\): \\( \\exists x \\, R(x) \\),
+    - \\( b \\): assumption \\( R(a) \\),
+    - \\( c \\): conclusion \\( P \\).  
+    \\( a \\) cannot appear in \\( P \\), its assumptions (except \\( b \\)), or \\( a \\)'s premises.
+
+---
+
+### **Rules of Equality (15–16):**
+15. **Equality Introduction (=I):**  
+    \\( a = a \\) can be introduced at any time with no assumptions. Cited as “\\( =I \\).”
+
+16. **Equality Elimination (=E):**  
+    If \\( a = b \\) and \\( P(a) \\), infer \\( P(b) \\) by substitution. Cited as “\\( a, b \\, \\text{=E} \\).”
+
+---
+
+### **Rule of Substitution (17):**
+17. **Substitution Instance (SI):**  
+    If \\( P, Q \\vdash R \\) is a valid sequent, and \\( P \\), \\( Q \\) appear in the proof, infer \\( R \\).  
+    Cited as “\\( a, b \\, \\text{SI} \\, X \\),” where \\( X \\) is the reference proof, and \\( a, b \\) are the lines for \\( P \\), \\( Q \\).
+
+---
+
+### Final Remarks
+
+Provide only the formal proof, using strict Suppes–Lemmon notation, for the problem described below. Include absolutely no introductory text, explanations, annotations, concluding remarks, or any other extraneous information. Your response must consist solely of a formal proof table adhering precisely to the Suppes–Lemmon deductive system. The "Formula (wff)" column of the table must contain no English text whatsoever. Ensure the final proof precisely follows the Suppes–Lemmon deductive system. Provide a fully formal proof using Suppes–Lemmon notation. The output should contain nothing other than the Suppes–Lemmon notated proof.

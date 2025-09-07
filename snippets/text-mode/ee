@@ -1,0 +1,52 @@
+# -*- mode: snippet -*-
+ # name: English Explanation Prompt Guide
+ # key: ee
+ # --
+ # Sentence Interpretation and Analysis Task
+
+ You are provided with the following sentence:
+
+ > "`(current-kill 0)`"
+
+ Analyze and interpret this sentence clearly by following the structured format below. Ensure your explanations are consistent, thorough, and relevant to the provided sentence.
+
+ ---
+
+ ## 1. Literal Interpretation
+
+ Clearly interpret the given sentence in its literal, word-for-word meaning. Carefully preserve and clarify any poetic, symbolic, figurative, or archaic language used.
+
+ ---
+
+ ## 2. Paraphrased Interpretation
+
+ Clearly rephrase the sentence in contemporary and natural English. Explain fully any implied meanings, idiomatic expressions, or symbolic content present.
+
+ ---
+
+ ## 3. Concise Summary
+
+ Summarize clearly and succinctly the primary meaning or main idea of the sentence in a single short sentence.
+
+ ---
+
+ ## 4. Key Vocabulary and Expressions
+
+ Identify clearly the key vocabulary words, idioms, phrases, or symbolic expressions from the sentence. For each term include the following:
+
+ - **Term**: (Word, phrase, or expression from the sentence)
+ - **Definition**: Clear, concise definition of the term.
+ - **Contextual Explanation**: Brief explanation of the term's importance and meaning within the context of the provided sentence.
+ - **Example Usage**: Provide one clear and relevant example sentence demonstrating typical usage of the term.
+
+ ---
+
+ ## 5. Contextual Interpretation
+
+ Clearly explain any cultural, symbolic, metaphorical, or situational significance underlying the sentence. Discuss the deeper implications, moral lessons, general wisdom, or practical advice implied by the sentence.
+
+ ---
+
+ Please ensure each section of your interpretation is clear, consistent, and directly focused on the provided sentence.
+
+$0

@@ -1,0 +1,107 @@
+# -*- mode: snippet -*-
+# name: Self-Contained Sentences
+# key: sc
+# --
+$0────────────────────────────────────────────────────
+PROMPT FOR CREATING ABSOLUTELY INDEPENDENT SENTENCES
+────────────────────────────────────────────────────
+
+Provided Text:  
+`(current-kill 0)`
+
+OBJECTIVE:  
+Convert the Provided Text into a set of self-contained sentences. Each new sentence must be comprehensible on its own and must avoid referencing any preceding or subsequent sentence. Preserve the original informational order as it appears in the Provided Text.
+
+ABSOLUTE RULES (NO EXCEPTIONS):
+
+1. COMPLETE SENTENCE INDEPENDENCE  
+   a) Stand-Alone Meaning:  
+      - Each sentence must be fully understandable by a reader who sees only that sentence in isolation.  
+   b) No External Reference:  
+      - No element (e.g., noun, pronoun, adjective) may depend on or refer to any concept introduced outside the current sentence.  
+   c) Zero Presumed Knowledge:  
+      - Assume the reader has no prior familiarity with the Provided Text or any external context.
+
+2. PRONOUN RESTRICTION  
+   a) Intra-Sentence Referents Only:  
+      - You may use a pronoun (e.g., “it,” “they,” “he,” “she”) only if the specific noun it refers to is explicitly mentioned within the same sentence.  
+   b) Expletive Constructions:  
+      - Constructions such as “It is raining” or “It is important to note” are permitted, provided that “it” does not ambiguously refer to an unstated noun.  
+   c) Minimizing Ambiguity:  
+      - If a pronoun might cause confusion, restate the noun (e.g., “The dog wagged its tail because the dog was happy”).
+
+3. PROHIBITION ON COORDINATING CONJUNCTIONS JOINING INDEPENDENT CLAUSES  
+   a) Independent Clauses:  
+      - Do not connect two independent clauses in the same sentence using “and,” “but,” “or,” “nor,” “for,” “so,” or “yet.”  
+   b) Permitted Uses of Coordinating Conjunctions:  
+      - You may use coordinating conjunctions within a single clause (e.g., listing items: “Mary likes apples and bananas.”).  
+   c) Subordinating Conjunctions:  
+      - Conjunctions such as “because,” “although,” “while,” or “if” are allowed, provided they maintain the independence requirement of Rule 1.
+
+4. EXPLICIT CONTEXT WITHIN EACH SENTENCE  
+   a) Include All Necessary Details:  
+      - Whenever a sentence introduces a person, place, object, or concept, provide sufficient context (e.g., “Paris is the capital city of France.”).  
+      - Repeat essential identifiers in subsequent sentences if needed, rather than relying on memory of prior references.
+
+5. CONDITIONAL SENTENCE COMBINATION  
+   a) Identical Structure and Subject Matter:  
+      - You may merge two or more consecutive sentences into a single sentence only if:  
+         i) They share the identical grammatical structure,  
+         ii) They address the same subject matter, and  
+         iii) Merging does not violate any other rule, including the pronoun restriction or reference to earlier text.  
+   b) When in Doubt, Separate  
+      - If there is any uncertainty about whether the sentences truly share the exact same structure and subject, keep them separate.
+
+6. ORIGINAL ORDER OF INFORMATION  
+   - Retain the exact sequence of topics, statements, or events as they appear in the Provided Text.
+
+7. PRIORITIZE CLARITY & SIMPLICITY  
+   - Favor short, declarative sentences.  
+   - If restating nouns or other information avoids confusion, do so even if it increases repetition.
+
+EXAMPLES:
+
+1. ALLOWED: COMPLETE SENTENCE INDEPENDENCE & PRONOUN RESTRICTION WITHIN A SINGLE SENTENCE  
+   • BEFORE: “The dog wagged its tail because it was happy.”  
+   • AFTER (Option A): “The dog wagged its tail because the dog was happy.”  
+   • AFTER (Option B): “The dog wagged its tail because it was happy.”  
+   Explanation: The pronoun “it” appears in the same sentence as its referent “the dog,” and is therefore allowed.
+
+2. FORBIDDEN: USING A PRONOUN TO REFER TO A NOUN IN A PREVIOUS SENTENCE  
+   • BEFORE: “John went to the store. He bought milk.”  
+   • AFTER: “John went to the store.” “John bought milk.”  
+   Explanation: The second sentence cannot use “He” referring back to John unless John is reintroduced in that same sentence.
+
+3. BANNING COORDINATING CONJUNCTIONS BETWEEN INDEPENDENT CLAUSES  
+   • BEFORE: “Mary likes apples, and John likes bananas.”  
+   • AFTER: “Mary likes apples.” “John likes bananas.”  
+   Explanation: Two independent clauses must become two separate sentences if connected by “and.”
+
+4. ALLOWED: SUBORDINATING CONJUNCTIONS  
+   • BEFORE: “Although it was raining, the children played outside.”  
+   • AFTER: “Although it was raining, the children played outside.”  
+   Explanation: “Although” is a subordinating conjunction, which is permitted within a single sentence.
+
+5. EXPLICIT CONTEXT  
+   • BEFORE: “The capital city is beautiful.”  
+   • AFTER (Option A): “The capital city of France is beautiful.”  
+   • AFTER (Option B): “Paris is beautiful.”  
+   Explanation: Context is given within the same sentence.
+
+6. CONDITIONAL SENTENCE COMBINATION (ALLOWED)  
+   • BEFORE: “The sun was shining brightly. The sun warmed the earth.”  
+   • AFTER: “The sun was shining brightly and warming the earth.”  
+   Explanation: Both sentences share the same subject, the same grammatical structure, and merging them does not cause pronoun confusion. (Alternatively, two separate sentences remain valid: “The sun was shining brightly.” “The sun warmed the earth.”)
+
+7. CONDITIONAL SENTENCE COMBINATION (FORBIDDEN)  
+   • BEFORE: “The cat sat on the mat. The dog barked loudly.”  
+   • AFTER: “The cat sat on the mat.” “The dog barked loudly.”  
+   Explanation: Different subjects (“The cat” vs. “The dog”) and different structures preclude combining.
+
+8. AVOIDING CROSS-SENTENCE REFERENCE  
+   • BEFORE: “The book was long. It was interesting.”  
+   • AFTER: “The book was long.” “The book was interesting.”  
+   Explanation: Combining them (“The book was long and it was interesting.”) would introduce a pronoun reference to the earlier part of the sentence.
+
+INSTRUCTION:  
+Apply these rules literally and without exception. Your transformed text must present a series of sentences that are each comprehensible in total isolation. Add context or repeat nouns where necessary to maintain clarity. While conciseness is encouraged, clarity and independence are paramount.

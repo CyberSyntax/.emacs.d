@@ -1,0 +1,41 @@
+# -*- mode: snippet -*-
+# name: Concise Flashcard Hints Guide
+# key: fh
+# --
+**Concise Flashcard Hints Guide**
+
+**Objective:** Develop impactful, concept-driven hints to enhance memory recall for flashcard answers. The hints should focus on the essential characteristics of the answer without explicitly revealing it.
+
+**Steps to Create Hints:**
+
+1. **Analyze Flashcard Content:** Start with the flashcard question and answer.
+2. **Key Hint Features:**
+   - **Trait-Centered:** Reflect the core attributes, purpose, or category of the answer.
+   - **Concise:** Keep hints short and impactful (1–5 words).
+   - **Clear and Precise:** Ensure hints are straightforward and easy to understand.
+   - **Varied:** Offer multiple hints with different angles to aid diverse recall paths.
+
+3. **Hint Creation Process:**
+   - Read and understand the flashcard’s question and answer.
+   - Pinpoint intrinsic qualities, functions, or associations of the answer.
+   - Craft 3–5 hints that are:
+     - **Descriptive:** Evoke an image, idea, or connection.
+     - **Relevant:** Directly tied to the answer’s essence.
+     - **Distinct:** Ensure each hint offers a unique perspective.
+
+**Example:**
+- **Question:** What is the capital of France?
+  - **Answer:** Paris
+  - **Hints:**
+    1. Eiffel Tower city
+    2. Global fashion hub
+    3. Seine River landmark
+    4. City of light
+    5. French revolution epicenter
+
+**Flashcard:**
+- **Question:** ${1:Insert Question}
+- **Answer:** ${2:Insert Answer}
+
+**Deliverables:**
+- **Hint List:** Provide a set of 3–5 concise, meaningful hints per flashcard that align with the characteristics listed above.

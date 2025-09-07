@@ -1,0 +1,492 @@
+;;; lisp/init-vendor.el -*- lexical-binding: t -*-
+
+;;; Enhanced Vendor Package Manager with Smart Dependency Resolution
+;;; Cross-platform, dependency-aware compilation system
+
+(defvar my-vendor-autonomous-config
+  '((cache-file . "vendor-cache.json")
+    (vendor-subdir . "lisp/vendor")
+    (compile-cache-subdir . "compiled-cache")
+    (repositories . (;; Third-party vendor packages
+                     ("https://github.com/bohonghuang/org-srs.git" . "org-srs")
+                     ("https://github.com/open-spaced-repetition/lisp-fsrs.git" . "fsrs")
+                     
+                     ;; My GitHub packages
+                     ("https://github.com/CyberSyntax/org-queue.git" . "org-queue")
+                     ("https://github.com/CyberSyntax/org-story.git" . "org-story")
+                     ("https://github.com/CyberSyntax/hanja-reading.git" . "hanja-reading")
+                     ("https://github.com/CyberSyntax/org-headline-manager.git" . "org-headline-manager")
+                     ))
+    (update-frequency . daily)
+    (auto-compile . t)
+    (compile-strategy . smart)
+    (fix-lexical-binding . t)
+    (handle-dependencies . t)
+    (compilation-warnings . moderate))
+  "Enhanced vendor configuration with dependency handling.")
+
+(defvar my-vendor-runtime-data nil
+  "Runtime data discovered about the environment.")
+
+(defun my-vendor-get-system-fingerprint ()
+  "Generate a truly cross-platform system fingerprint."
+  (let* ((emacs-version (format "%d.%d" emacs-major-version emacs-minor-version))
+         (system-info (list
+                       system-type
+                       system-configuration
+                       (if (boundp 'system-configuration-options)
+                           system-configuration-options
+                         "unknown")
+                       ;; Include feature set that affects compilation
+                       (if (featurep 'native-compile) "native" "bytecode")
+                       (if (featurep 'json) "json" "no-json")))
+         (fingerprint-string (format "%s-%s" emacs-version (string-join (mapcar #'prin1-to-string system-info) "-"))))
+    ;; Create a short, filesystem-safe hash
+    (let ((hash (secure-hash 'sha256 fingerprint-string)))
+      (format "%s-%s" 
+              emacs-version
+              (substring hash 0 12)))))
+
+(defun my-vendor-ensure-lexical-binding (file-path)
+  "Ensure FILE-PATH has proper lexical-binding header."
+  (when (and (cdr (assoc 'fix-lexical-binding my-vendor-autonomous-config))
+             (string-suffix-p ".el" file-path)
+             (file-writable-p file-path))
+    (with-temp-buffer
+      (insert-file-contents file-path)
+      (goto-char (point-min))
+      ;; Check if first line has lexical-binding
+      (unless (and (looking-at "^;;")
+                   (save-excursion
+                     (re-search-forward "lexical-binding:" (line-end-position) t)))
+        ;; Add lexical-binding header
+        (goto-char (point-min))
+        (if (looking-at "^;;")
+            ;; Insert after existing header comment
+            (progn
+              (end-of-line)
+              (insert "\n;;; -*- lexical-binding: t; -*-"))
+          ;; Insert at very beginning
+          (insert ";;; -*- lexical-binding: t; -*-\n"))
+        (write-region (point-min) (point-max) file-path nil 'silent)
+        t))))
+
+(defun my-vendor-analyze-dependencies (el-file)
+  "Analyze dependencies in EL-FILE and return list of required features."
+  (let ((deps '()))
+    (with-temp-buffer
+      (condition-case nil
+          (progn
+            (insert-file-contents el-file nil 0 (* 10 1024)) ; Read first 10KB
+            (goto-char (point-min))
+            ;; Find require statements
+            (while (re-search-forward "(\\s-*require\\s-+'\\([^)\\s-]+\\)" nil t)
+              (let ((feature (match-string 1)))
+                (unless (or (string-prefix-p "cl-" feature)
+                           (member feature '("org" "emacs")))
+                  (push feature deps))))
+            ;; Find autoload comments that might indicate dependencies
+            (goto-char (point-min))
+            (while (re-search-forward ";;;###autoload\\|;;; Code:\\|;;; Commentary:" nil t)
+              (forward-line 1)
+              (when (re-search-forward "(\\s-*require\\s-+'\\([^)\\s-]+\\)" (line-end-position 3) t)
+                (let ((feature (match-string 1)))
+                  (unless (member feature deps)
+                    (push feature deps))))))
+        (error nil)))
+    deps))
+
+(defun my-vendor-get-package-files (repo-dir)
+  "Get all .el files in REPO-DIR with dependency analysis."
+  (let ((files '()))
+    (when (file-directory-p repo-dir)
+      (dolist (file (directory-files-recursively repo-dir "\\.el\\'"))
+        (unless (string-match-p "/\\." (file-name-nondirectory file)) ; Skip hidden files
+          (let ((deps (my-vendor-analyze-dependencies file)))
+            (push (list file deps) files)))))
+    ;; Sort by dependency count (fewer deps first)
+    (sort files (lambda (a b) (< (length (cadr a)) (length (cadr b)))))))
+
+(defun my-vendor-setup-compilation-environment (repo-dir cache-dir)
+  "Set up proper compilation environment for the package."
+  (let ((load-path-additions '()))
+    ;; Add the source directory to load-path temporarily
+    (push repo-dir load-path-additions)
+    (push cache-dir load-path-additions)
+    
+    ;; Add all vendor packages to load-path for cross-dependencies
+    (let* ((config my-vendor-autonomous-config)
+           (vendor-dir (expand-file-name 
+                        (cdr (assoc 'vendor-subdir config))
+                        (or (bound-and-true-p user-emacs-directory)
+                            user-emacs-directory))))
+      (dolist (repo (cdr (assoc 'repositories config)))
+        (let ((other-repo-dir (expand-file-name (cdr repo) vendor-dir)))
+          (when (and (file-directory-p other-repo-dir)
+                     (not (string= other-repo-dir repo-dir)))
+            (push other-repo-dir load-path-additions))))
+      
+      ;; Also add their compile caches
+      (dolist (repo (cdr (assoc 'repositories config)))
+        (let ((other-cache-dir (my-vendor-get-compile-cache-dir (cdr repo))))
+          (when (and (file-directory-p other-cache-dir)
+                     (not (string= other-cache-dir cache-dir)))
+            (push other-cache-dir load-path-additions)))))
+    
+    load-path-additions))
+
+(defun my-vendor-compile-package-smart (repo-name source-dir)
+  "Smart compilation with proper dependency resolution and cross-platform support."
+  (let* ((cache-dir (my-vendor-get-compile-cache-dir repo-name))
+         (config my-vendor-autonomous-config)
+         (auto-compile (cdr (assoc 'auto-compile config)))
+         (strategy (cdr (assoc 'compile-strategy config)))
+         (handle-deps (cdr (assoc 'handle-dependencies config)))
+         (warning-level (cdr (assoc 'compilation-warnings config))))
+    
+    (unless auto-compile
+      (message "Auto-compilation disabled, using source files for %s" repo-name)
+      (cl-return-from my-vendor-compile-package-smart source-dir))
+    
+    (message "Smart compilation for %s..." repo-name)
+    (message "  Source: %s" source-dir)
+    (message "  Cache:  %s" cache-dir)
+    
+    (let ((needs-compile (pcase strategy
+                          ('always t)
+                          ('never nil)
+                          ('smart (my-vendor-needs-compilation-p source-dir cache-dir))
+                          (_ t))))
+      
+      (if (not needs-compile)
+          (progn
+            (message "  ✓ Using cached compilation")
+            cache-dir)
+        (progn
+          (message "  → Smart compiling with dependency resolution...")
+          (condition-case err
+              (let ((original-load-path load-path)
+                    (compiled-count 0)
+                    (error-count 0)
+                    (warning-count 0))
+                
+                ;; Create cache directory
+                (unless (file-directory-p cache-dir)
+                  (make-directory cache-dir t))
+                
+                ;; Set up compilation environment
+                (let ((load-path-additions (my-vendor-setup-compilation-environment source-dir cache-dir)))
+                  (dolist (addition load-path-additions)
+                    (add-to-list 'load-path addition)))
+                
+                (unwind-protect
+                    ;; Get files with dependency analysis
+                    (let ((file-info-list (my-vendor-get-package-files source-dir)))
+                      (message "    Found %d files to compile" (length file-info-list))
+                      
+                      (dolist (file-info file-info-list)
+                        (let* ((el-file (car file-info))
+                               (relative-path (file-relative-name el-file source-dir))
+                               (target-el (expand-file-name relative-path cache-dir))
+                               (target-elc (concat target-el "c"))
+                               (target-dir (file-name-directory target-el)))
+                          
+                          ;; Create target directory
+                          (unless (file-directory-p target-dir)
+                            (make-directory target-dir t))
+                          
+                          ;; Copy and potentially fix source file
+                          (copy-file el-file target-el t)
+                          (when (my-vendor-ensure-lexical-binding target-el)
+                            (message "    Fixed lexical-binding in %s" relative-path))
+                          
+                          ;; Compile with proper error handling
+                          (condition-case compile-err
+                              (let ((byte-compile-error-on-warn (eq warning-level 'strict))
+                                    (byte-compile-warnings 
+                                     (pcase warning-level
+                                       ('none nil)
+                                       ('moderate '(obsolete))
+                                       ('strict t)
+                                       (_ '(obsolete))))
+                                    (byte-compile-log-buffer-name "*Vendor Compile Log*"))
+                                
+                                ;; Try compilation
+                                (if (byte-compile-file target-el)
+                                    (progn
+                                      (setq compiled-count (1+ compiled-count))
+                                      (message "    ✓ %s" relative-path))
+                                  (progn
+                                    (setq warning-count (1+ warning-count))
+                                    (message "    ⚠ %s (warnings)" relative-path))))
+                            (error
+                             (setq error-count (1+ error-count))
+                             (message "    ✗ %s: %s" relative-path 
+                                     (error-message-string compile-err)))))))
+                  
+                  ;; Restore original load-path
+                  (setq load-path original-load-path))
+                
+                (message "  ✓ Compilation complete: %d compiled, %d warnings, %d errors" 
+                         compiled-count warning-count error-count)
+                
+                ;; Return cache dir if we have any successful compilations, otherwise source
+                (if (> compiled-count 0)
+                    cache-dir
+                  source-dir))
+            (error
+             (message "  ✗ Smart compilation failed: %s" (error-message-string err))
+             (message "  → Falling back to source directory")
+             source-dir)))))))
+
+(defun my-vendor-get-compile-cache-dir (repo-name)
+  "Get cross-platform compilation cache directory for REPO-NAME."
+  (let* ((config my-vendor-autonomous-config)
+         (vendor-dir (expand-file-name 
+                      (cdr (assoc 'vendor-subdir config))
+                      (or (bound-and-true-p user-emacs-directory)
+                          user-emacs-directory)))
+         (cache-subdir (cdr (assoc 'compile-cache-subdir config)))
+         (fingerprint (my-vendor-get-system-fingerprint)))
+    (expand-file-name 
+     (format "%s/%s/%s" cache-subdir fingerprint repo-name)
+     vendor-dir)))
+
+(defun my-vendor-needs-compilation-p (source-dir cache-dir)
+  "Check if SOURCE-DIR needs compilation compared to CACHE-DIR."
+  (or (not (file-directory-p cache-dir))
+      (let ((source-newest 0)
+            (cache-newest 0)
+            (cache-files-exist nil))
+        
+        ;; Find newest .el file in source
+        (dolist (file (directory-files-recursively source-dir "\\.el\\'"))
+          (let ((mtime (float-time (nth 5 (file-attributes file)))))
+            (when (> mtime source-newest)
+              (setq source-newest mtime))))
+        
+        ;; Find newest .elc file in cache
+        (when (file-directory-p cache-dir)
+          (dolist (file (directory-files-recursively cache-dir "\\.elc\\'"))
+            (setq cache-files-exist t)
+            (let ((mtime (float-time (nth 5 (file-attributes file)))))
+              (when (> mtime cache-newest)
+                (setq cache-newest mtime)))))
+        
+        ;; Need compilation if no cache files or source is newer
+        (or (not cache-files-exist)
+            (> source-newest cache-newest)))))
+
+;; [Previous helper functions remain the same: probe-capability, discover-environment, etc.]
+(defun my-vendor-probe-capability (test-name test-function)
+  "Probe a capability using TEST-FUNCTION, cache result under TEST-NAME."
+  (or (cdr (assoc test-name my-vendor-runtime-data))
+      (let ((result (condition-case err
+                        (funcall test-function)
+                      (error nil))))
+        (push (cons test-name result) my-vendor-runtime-data)
+        result)))
+
+(defun my-vendor-discover-environment ()
+  "Discover all environment capabilities dynamically."
+  (list
+   (cons 'git-functional
+         (my-vendor-probe-capability 'git-functional
+           (lambda ()
+             (and (executable-find "git")
+                  (zerop (with-temp-buffer
+                           (call-process "git" nil t nil "--version")))))))
+   (cons 'network-available
+         (my-vendor-probe-capability 'network-available
+           (lambda ()
+             (condition-case nil
+                 (with-temp-buffer
+                   (let ((url-request-timeout 5))
+                     (url-insert-file-contents "https://api.github.com" nil 0 100)
+                     t))
+               (error nil)))))
+   (cons 'filesystem-writable
+         (my-vendor-probe-capability 'filesystem-writable
+           (lambda ()
+             (let ((test-dir (make-temp-file "emacs-fs-test" t)))
+               (unwind-protect
+                   (and (file-directory-p test-dir)
+                        (file-writable-p test-dir))
+                 (ignore-errors
+                   (when (file-exists-p test-dir)
+                     (delete-directory test-dir t))))))))
+   (cons 'compilation-available
+         (my-vendor-probe-capability 'compilation-available
+           (lambda ()
+             (condition-case nil
+                 (fboundp 'byte-compile-file)
+               (error nil)))))))
+
+(defun my-vendor-select-strategy ()
+  "Dynamically select the best strategy based on discovered capabilities."
+  (let ((env-data (my-vendor-discover-environment)))
+    (let ((git-ok (cdr (assoc 'git-functional env-data)))
+          (network-ok (cdr (assoc 'network-available env-data)))
+          (fs-writable (cdr (assoc 'filesystem-writable env-data))))
+      
+      (cond
+       ((and git-ok network-ok fs-writable) 'git-update)
+       ((not fs-writable) 'readonly)
+       (t 'fallback)))))
+
+(defun my-vendor-should-update-p ()
+  "Check if we should update today."
+  (let* ((config my-vendor-autonomous-config)
+         (cache-file (expand-file-name 
+                      (cdr (assoc 'cache-file config))
+                      (or (bound-and-true-p cache-dir)
+                          temporary-file-directory)))
+         (today (format-time-string "%Y-%m-%d")))
+    
+    (if (file-exists-p cache-file)
+        (condition-case nil
+            (let ((last-update (with-temp-buffer
+                               (insert-file-contents cache-file)
+                               (string-trim (buffer-string)))))
+              (not (string= last-update today)))
+          (error t))
+      t)))
+
+(defun my-vendor-mark-updated ()
+  "Mark that we updated today."
+  (let* ((config my-vendor-autonomous-config)
+         (cache-file (expand-file-name 
+                      (cdr (assoc 'cache-file config))
+                      (or (bound-and-true-p cache-dir)
+                          temporary-file-directory)))
+         (today (format-time-string "%Y-%m-%d")))
+    (condition-case nil
+        (with-temp-file cache-file
+          (insert today))
+      (error nil))))
+
+(defun my-vendor-execute-git-update (repo-url repo-dir)
+  "Execute git operation for REPO-URL into REPO-DIR."
+  (let ((success nil))
+    (condition-case err
+        (progn
+          (if (file-directory-p repo-dir)
+              (let ((default-directory repo-dir))
+                (message "Updating repo in %s..." repo-dir)
+                (setq success (zerop (call-process "git" nil nil nil "pull" "--ff-only")))
+                (when success
+                  (message "  ✓ Successfully updated %s" repo-dir)))
+            (message "Cloning %s to %s..." repo-url repo-dir)
+            (setq success (zerop (call-process "git" nil nil nil "clone" repo-url repo-dir)))
+            (when success
+              (message "  ✓ Successfully cloned to %s" repo-dir)))
+          success)
+      (error 
+       (message "  ✗ Git operation failed for %s: %s" repo-url (error-message-string err))
+       nil))))
+
+(defun my-vendor-autonomous-setup ()
+  "Enhanced autonomous vendor package setup with smart compilation."
+  (let* ((config my-vendor-autonomous-config)
+         (strategy (my-vendor-select-strategy))
+         (vendor-dir (expand-file-name 
+                      (cdr (assoc 'vendor-subdir config))
+                      (or (bound-and-true-p user-emacs-directory)
+                          user-emacs-directory)))
+         (repositories (cdr (assoc 'repositories config)))
+         (should-update (my-vendor-should-update-p))
+         (updated-any nil)
+         (fingerprint (my-vendor-get-system-fingerprint)))
+    
+    (message "=== Enhanced Cross-Platform Vendor Setup ===")
+    (message "Platform fingerprint: %s" fingerprint)
+    (message "Vendor directory: %s" vendor-dir)
+    (message "Strategy: %s" strategy)
+    (message "Should update: %s" (if should-update "YES" "NO"))
+    
+    ;; Create vendor directory
+    (condition-case nil
+        (unless (file-directory-p vendor-dir)
+          (make-directory vendor-dir t))
+      (error 
+       (setq strategy 'readonly)))
+    
+    ;; Execute strategy
+    (pcase strategy
+      ('git-update
+       (if should-update
+           (progn
+             (dolist (repo repositories)
+               (let* ((url (car repo))
+                      (name (cdr repo))
+                      (repo-dir (expand-file-name name vendor-dir)))
+                 (when (my-vendor-execute-git-update url repo-dir)
+                   (setq updated-any t))))
+             (when updated-any (my-vendor-mark-updated)))
+         (message "Skipping update - already done today")))
+      ('readonly (message "Read-only mode"))
+      (_ (message "Fallback mode")))
+    
+    ;; Smart compile and add to load-path
+    (let ((added-paths 0))
+      (message "Smart compilation and load-path setup:")
+      (dolist (repo repositories)
+        (let* ((name (cdr repo))
+               (source-dir (expand-file-name name vendor-dir)))
+          (if (file-directory-p source-dir)
+              (let ((final-dir (my-vendor-compile-package-smart name source-dir)))
+                (add-to-list 'load-path final-dir)
+                (setq added-paths (1+ added-paths))
+                (message "  ✓ %s -> %s" name 
+                        (if (string= final-dir source-dir) "SOURCE" "COMPILED")))
+            (message "  ✗ %s (missing)" name))))
+      (message "=== Cross-Platform Setup Complete: %d packages ===" added-paths))))
+
+;; Execute setup
+(my-vendor-autonomous-setup)
+
+;; Enhanced control functions
+(defun my-vendor-status ()
+  "Show detailed cross-platform status."
+  (interactive)
+  (let* ((config my-vendor-autonomous-config)
+         (fingerprint (my-vendor-get-system-fingerprint)))
+    (message "=== Cross-Platform Vendor Status ===")
+    (message "Platform: %s" fingerprint)
+    (message "Lexical binding fix: %s" (if (cdr (assoc 'fix-lexical-binding config)) "ON" "OFF"))
+    (message "Dependency handling: %s" (if (cdr (assoc 'handle-dependencies config)) "ON" "OFF"))
+    (message "Warning level: %s" (cdr (assoc 'compilation-warnings config)))
+    (my-vendor-discover-environment)
+    (message "Capabilities: %S" my-vendor-runtime-data)))
+
+(defun my-vendor-toggle-compilation ()
+  "Toggle auto-compilation on/off."
+  (interactive)
+  (let ((current (cdr (assoc 'auto-compile my-vendor-autonomous-config))))
+    (setcdr (assoc 'auto-compile my-vendor-autonomous-config) (not current))
+    (message "Auto-compilation: %s" (if (not current) "ENABLED" "DISABLED"))))
+
+(defun my-vendor-force-recompile ()
+  "Force complete recompilation."
+  (interactive)
+  (my-vendor-clean-cache)
+  (my-vendor-autonomous-setup))
+
+(defun my-vendor-clean-cache ()
+  "Clean compilation cache."
+  (interactive)
+  (let* ((config my-vendor-autonomous-config)
+         (vendor-dir (expand-file-name 
+                      (cdr (assoc 'vendor-subdir config))
+                      (or (bound-and-true-p user-emacs-directory)
+                          user-emacs-directory)))
+         (cache-base-dir (expand-file-name 
+                          (cdr (assoc 'compile-cache-subdir config))
+                          vendor-dir)))
+    (when (file-directory-p cache-base-dir)
+      (delete-directory cache-base-dir t)
+      (message "Cache cleaned: %s" cache-base-dir))))
+
+(provide 'init-vendor)
+
+;;; lisp/init-vendor.el ends here

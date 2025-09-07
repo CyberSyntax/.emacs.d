@@ -1,0 +1,159 @@
+# -*- mode: snippet -*-
+# name: Global Narrative Densification Protocol — Sentence-Focus Edition (System-Selected Anchors)
+# key: nd
+# --
+Global Narrative Densification Protocol — Sentence Focus, Prev-Only Anchoring, Split-First, Loss-Compensated
+
+Purpose
+- Build a large-scale saga by reinforcing causality and foreshadow/payoff while increasing cohesion, density, and controlled complexity.
+- Exactly one operation per request: COMPRESS, SPLIT, ADD, or IMPROVE.
+- Every plot point is one sentence, action-only, outcome-free; all participating characters are named; each plot point has or will receive a unique ID.
+
+Core invariants
+- Atomicity (outcome-free): one primary action per sentence; do not encode effects/results; consequences live only as links to other nodes.
+- Named actors: use registered character names; no generic roles or placeholders.
+- Causality closure: every kept/created node must have ≥1 inbound (←) and ≥1 outbound (→) link after the operation.
+- Density monotonicity: for the local operation window W, Δδ = |E(W_out)|/|W_out| − |E(W_in)|/|W_in| ≥ 0 (prefer > 0).
+- Tri-graph model:
+  - CG (Causal Graph): causes/enables/resolves/foreshadows/contradicts.
+  - TG (Diegetic Time): when events occur in-world (partial order).
+  - SG (Sequence Graph): viewer-facing order.
+  - Constraint: causes ⇒ TG precedence; SG may diverge for aesthetics but CG must remain recoverable via links.
+- Legal link types: causes, enables, resolves, foreshadows, contradicts, mirrors, parallels, escalates.
+- N-ary relations via Link nodes (TYPE=Link; MEMBERS: "..."; LINK_TYPE: …).
+- Location/Time coherence: do not imply impossible movement or illegal causation; add enables for justified transitions.
+
+Input
+`(current-kill 0)`
+- Provide one action-only, outcome-free sentence as the focus; optional meta helps disambiguate; Prev anchor is used to pinpoint insertion in SG. Next is implicit (the pre-edit immediate successor of Prev).
+[FOCUS_SENTENCE: {one action-only sentence; outcome-free; all actors named}]
+[FOCUS_META: TIMELINE=?, TIME=?, LOC=?, ACTORS=?]   ; optional
+[Prev: "..." | <omitted>]                            ; SG anchor for placement; optional except for ADD
+[Op: AUTO | COMPRESS | SPLIT | ADD | IMPROVE]       ; default=AUTO
+
+Resolution (mapping)
+- Map the focus sentence to an existing node (id) or treat as provisional if Op=ADD:
+  1) EXACT_MATCH by normalized text → RESOLVED("...")
+  2) META_MATCH by ACTORS/TIME/TIMELINE/LOC → RESOLVED("...")
+  3) FUZZY_MATCH by token-set with actor identity → RESOLVED("...")
+- If multiple candidates: [AMBIGUOUS: candidates=["..."; "..."]; disambiguation keys=ACTORS/TIME/LOC].
+- If none and Op≠ADD: [BLOCKED: E-RESOLVE-404].
+
+Focus-coupling (must hold)
+- The chosen op must modify/replace Focus, or link any New directly to Focus via allowed link types, or resolve a Thread/Promise attached to Focus. Else: [BLOCKED].
+
+Split-first policy and loss compensation
+- Causal Latency Index (CLI): count extractable implicit preconditions/instruments/triggers/aims or implied consequences embedded in the Focus sentence.
+- If CLI ≥ 1 and extraction is possible without unsupported world facts, prefer SPLIT over IMPROVE.
+- Loss-compensation rule: whenever a rewrite (SPLIT or IMPROVE) eliminates implicit causal content from the Focus sentence, create New nodes that actionize those antecedents or consequents, and place them with explicit Prev anchors.
+
+Prev-only anchoring (SG)
+- Prev is a hard SG boundary chosen by you (or by the system if omitted).
+- Next is implicit: the pre-edit immediate SG successor of Prev.
+- Insertion always occurs immediately after Prev in SG by splitting the Prev→Next edge. The output does not print Next.
+
+Operation selection (AUTO)
+- Score S = 3·(#resolves) + 2·(#new_foreshadows) + 2·Δδ + 1·Δcausal-clarity − 2·risk − 1·Δ|W|.
+- Priority order (after CLI assessment): SPLIT (if CLI≥1) > ADD (if Prev is supplied or can be inferred) > COMPRESS (strict redundancy) > IMPROVE (precision without hook loss).
+- Do not choose IMPROVE if feasible SPLIT yields higher S.
+
+Actionization of implied content (for SPLIT/IMPROVE)
+- Antecedentization: convert implied preconditions/instruments into explicit action sentences performed by named actors.
+- Consequentization: convert implied consequences into explicit action sentences performed by named actors (no state-only phrasing).
+- Motivation-bridging: when intent is implied, actionize it as a concrete step (e.g., pursuit, request, assembly, transmission), not a mental state summary.
+- Each actionized New gets its own placement after a specified Prev (your Prev if shared, or system-chosen if omitted).
+
+Operation windows
+- COMPRESS: W_in = {Focus and its chosen counterpart(s)} ∪ their SG neighbors; W_out = {Keep} (+ updated links).
+- SPLIT: W_in = {Focus} ∪ its neighbors; W_out = {Focus’ (trimmed)} ∪ {New1..NewK}, each placed after a specified Prev.
+- ADD: W_in = {Prev and its immediate SG successor}; W_out = {Prev, New, Next_derived}.
+- IMPROVE: W_in = {Focus} ∪ neighbors; W_out = {Focus’} (+ compensatory New if required by loss-compensation).
+
+Output templates (exactly one block; no commentary)
+
+[COMPRESS
+Focus: "..."
+Keep: "..." | new
+Drop: "..."                        ; strict redundancy/subsumption
+Prev (SG): "..."                   ; optional if system-chosen
+Sentence (Keep/new): {one action-only; outcome-free; all actors named}
+Antecedents (CG): ← "..."; "..."
+Consequents (CG): → "..."; "..."
+Links: update {causes|enables|resolves|foreshadows|mirrors|parallels}; replace/remove contradicts
+Density: assert Δδ ≥ 0
+Justify: {REDUNDANCY_ELIMINATION|SUBSUMPTION|NECESSITY_UPGRADE|PAYOFF_TIGHTEN}
+]
+
+[SPLIT
+Focus: "..."
+Focus’ (trimmed): {one action-only; outcome-free; names}
+Compensatory New (actionized implied content; K ≤ 3 unless S increases and Δδ ≥ 1):
+- New1
+  Prev (SG): "..."                  ; provided or system-chosen
+  Sentence: {one action-only; outcome-free; names}
+  Antecedents (CG): ← "..."; "..."
+  Consequents (CG): → "..."; "..."
+  FocusLink: Focus —{causes|enables|resolves|foreshadows|mirrors|parallels}→ New1 | New1 → Focus (≥1 required)
+- New2
+  Prev (SG): "..."
+  Sentence: {one action-only; outcome-free; names}
+  Antecedents (CG): ← "..."; "..."
+  Consequents (CG): → "..."; "..."
+  FocusLink: as above
+… (extend as needed under K and Δδ constraints)
+Density: assert Δδ ≥ 0; preserve or resolve hooks
+Justify: {ATOMICITY_FIX|CAUSAL_EXPLICITATION|PAYOFF_STAGING|GLOBAL_WEAVE|LOSS_COMPENSATION}
+]
+
+[ADD
+Focus: "..." | <provisional if focus sentence is new>
+Prev (SG): "..."                   ; required
+NewID: new
+Sentence: {one action-only; outcome-free; names}
+Antecedents (CG): ← "..."; "..."
+Consequents (CG): → "..."; "..."
+Prev→New (CG): {causes|enables|mirrors|parallels}
+New→(implicit Next) (CG): {causes|enables|resolves|foreshadows}  ; Next is the pre-edit successor of Prev (not printed)
+FocusLink: Focus —{causes|enables|resolves|foreshadows|mirrors|parallels}→ New | New → Focus (≥1 required)
+Threads/Promises: resolves "..." or foreshadows "..." (≥1 preferred)
+Density: assert Δδ ≥ 0
+Justify: {RESOLVE|FORESHADOW|NECESSITY_UPGRADE|ECHO_BINDING}
+]
+
+[IMPROVE
+Focus: "..."
+Sentence (replacement): {one action-only; outcome-free; names; sharpened verb/parameters}
+Antecedents (CG): ← "..."; "..."
+Consequents (CG): → "..."; "..."
+Links: add/retag {causes|enables|resolves|foreshadows|mirrors|parallels}; eliminate contradicts with replacements
+Loss-Compensation New (if implicit content removed):
+- New1
+  Prev (SG): "..."                  ; provided or system-chosen
+  Sentence: {one action-only; outcome-free; names}
+  Antecedents (CG): ← "..."
+  Consequents (CG): → "..."
+Density: assert Δδ ≥ 0; no hook loss
+Justify: {PRECISION|PAYOFF_TIGHTEN|FORESHADOW_TIGHTEN|LOSS_COMPENSATION}
+]
+
+Validation (hard unless noted)
+- E-RESOLVE-404: focus sentence not mapped and Op≠ADD with no safe Focus-coupling
+- E-CAUS-001: any kept/created node lacks inbound or outbound link
+- E-SENT-001: multiple primary actions or embedded outcomes in a sentence
+- E-ACTOR-001: unnamed or generic actor reference
+- E-TIME-001: illegal causation relative to TG or unmodeled cross-line claims
+- E-LOC-001: impossible location continuity without enabling link
+- E-DENS-001: Δδ < 0
+- E-ADD-ADJ-001: Prev has no immediate successor in SG (corrupt sequence) or cannot be split
+- E-SPLIT-ANCHOR-001: compensatory New lacks valid Prev anchor
+- E-ACTOR-NEW-001: new actor without pre-anchoring or without ≥2 bonding edges (≥1 inbound, ≥1 outbound)
+- E-HOOK-LOSS: reduction of active setups/promises touching Focus without explicit resolve/migration
+- W-FORESH-001: no new foreshadows when feasible (warning)
+
+Operating rules
+- One request → one block.
+- For ADD, Prev is required; Next is implicit and not printed; insertion is strictly immediately after Prev in SG.
+- For SPLIT and IMPROVE, any compensatory New must be placed with explicit Prev anchors; if omitted, the system selects suitable Prev anchors that maximize S while respecting SG adjacency and CG/TG legality.
+- Prefer SPLIT over IMPROVE when CLI≥1, and ensure that any removed implicit content is actionized as compensatory New.
+- Keep sentences strictly action-only and outcome-free; express effects entirely via links (Antecedents/Consequents fields).
+- Increase density primarily by cross-thread bindings and targeted payoff/foreshadow links, not by uncontrolled entity proliferation.

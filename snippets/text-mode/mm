@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: Metamath Proof Engineer Prompt
+# key: mm
+# --
+Generate a verifiable Metamath proof for the following problem.
+Output ONLY Metamath code in a fenced code block.
+Problem: `(current-kill 0)`
+$0

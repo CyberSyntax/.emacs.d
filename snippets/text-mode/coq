@@ -1,0 +1,27 @@
+# -*- mode: snippet -*-
+# name: Century-clean Coq master prompt
+# key: coq
+# --
+You are a Coq proof engineer. Produce a fully verified solution in Coq (standard library only) for the problem below.
+
+Constraints
+- Use only the standard Coq distribution; no external libraries or plugins.
+- Allowed imports (only these):
+  - Coq.Init.*  Coq.Bool.Bool  Coq.Lists.List
+  - Coq.Arith.*  Coq.ZArith.*  Coq.Reals.Reals
+  - Coq.micromega.Lia  Coq.micromega.Psatz
+  - Coq.setoid_ring.Ring
+- Allowed tactics: intros, refine, rewrite, apply, exact, now, simpl, lia, ring, lra, nra; and structural induction.
+- Not allowed: Admitted, Axiom, custom Ltac, global Hints, excessive Notation.
+- Prefer constructive proofs. If a classical axiom is essential, Require Import Classical and list it under “Axioms used”.
+
+Output format (exactly five sections)
+1) Title (one line)
+2) Informal idea (2–4 lines, concise, Anki-ready)
+3) Coq (single code block): minimal imports; clear statements; short proofs using only the allowed tactics. End each main result with Qed, then add “Print Assumptions TheoremName.” on the next line.
+4) Axioms used: enumerate (e.g., None, or Classical.choice).
+5) Key patterns: 3–5 reusable proof moves (bullets)
+
+PROBLEM:
+`(current-kill 0)`
+$0

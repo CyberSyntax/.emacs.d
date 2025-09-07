@@ -1,0 +1,24 @@
+# -*- mode: snippet -*-
+# name: AB-test alt generator
+# key: ab
+# --
+Original:
+`(current-kill 0)`
+
+---
+
+Act as a master line editor. Produce exactly one polished alternative to the provided text.
+
+Requirements:
+- Preserve the original’s full meaning, tone, and nuance.
+- Elevate flow, rhythm, and clarity; favor precise diction and refined cadence.
+- Maintain the original sentence count and paragraphing.
+- Do not add, remove, or reorder information.
+- Do not alter names, titles, or setting details.
+
+Output:
+- Provide only the revised text (no commentary or explanations).
+
+Goal:
+- A refined variant that could win a blind A/B test for superior literary quality.
+$0

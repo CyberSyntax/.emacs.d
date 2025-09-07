@@ -1,0 +1,24 @@
+# -*- mode: snippet -*-
+# name: bilingual-text-transform
+# key: ekh
+# --
+**Text Transformation Guidelines** 텍스트 變換 指針
+
+Create an interwoven bilingual text by placing translations side by side within flowing paragraphs. 飜譯을 흐르는 段落 내에서 竝置하여 交織된 二重言語 텍스트를 創造하라. Each English sentence must be immediately followed by its direct translation in 國漢文混用. 각 英語 文章 직후에 그것의 直接 飜譯을 國漢文混用으로 配置해야 한다. These are translation pairs, not continuing narratives. 이는 繼續되는 敍事가 아닌 飜譯 쌍이다.
+
+**Essential Requirements** 必須 要件
+Every sentence pair must express the identical content in both languages. 모든 文章 쌍은 두 言語로 同一한 內容을 表現해야 한다. Employ sophisticated vocabulary and precise 漢字 usage following Korean scholarly tradition. 洗鍊된 語彙와 韓國 學術 傳統에 따른 正確한 漢字를 使用하라. The second sentence translates the first—it does not continue or expand the thought. 두 番째 文章은 첫 番째를 飜譯한다—思考를 繼續하거나 擴張하지 않는다.
+
+**Critical: Translation Juxtaposition** 決定的: 飜譯의 竝置
+Each thought appears twice—once in English, once in 國漢文混用—before any new thought begins. 각 思考는 두 番—英語로 한 番, 國漢文混用으로 한 番—새로운 思考가 始作되기 전에 나타난다. The languages mirror each other; they do not dialogue or alternate in narrative progression. 言語들은 서로를 反映한다; 敍事 進行에서 對話하거나 交替하지 않는다.
+
+**Format Structure** 形式 構造
+Sentences flow continuously within paragraphs without line breaks between language pairs. 文章들은 言語 쌍 사이에 줄바꿈 없이 段落 내에서 連續的으로 흐른다. Multiple translation pairs coexist in each paragraph. 複數의 飜譯 쌍이 각 段落에 共存한다. The reading experience remains horizontal and unified. 讀書 經驗은 水平的이고 統合的으로 維持된다.
+
+**The Goal** 目標
+Produce a text where each idea is elegantly expressed twice, creating a bilingual harmony that preserves all meaning and nuance. 각 아이디어가 優雅하게 두 番 表現되어, 모든 意味와 뉘앙스를 保存하는 二重言語 和音을 創造하는 텍스트를 生産하라.
+
+---
+**Original Text:**
+`(current-kill 0)`
+$0

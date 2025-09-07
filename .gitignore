@@ -1,17 +1,35 @@
-# Compiled
-*.elc
+# ================================================================
+# .gitignore for Emacs Lisp
+# ================================================================
 
-# Packaging
+# Local Dependencies & Package Managers
+/elpa/
+/eln-cache/
+/lisp/vendor/
+/lisp/init-local.el
+/transient/
+
+# User-specific & Volatile Data
+/var/
+*.~undo-tree
+
+# Executable Scripts Directory
+/bin/*
+!/bin/uuidgenlc
+
+# Packaging Tool Directories
 .cask/
 .eask/
 .eldev/
 .keg/
 
-# Built distribution
+# Build Artifacts
 dist/
 
-# Backup files
+# Compiled & Temporary Files
+*.elc
 *~
+.#*
 
-# Undo-tree save-files
-*.~undo-tree
+# OS-specific metadata
+.DS_Store

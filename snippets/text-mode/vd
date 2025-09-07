@@ -1,0 +1,101 @@
+# -*- mode: snippet -*-
+# name: Vocabulary Definition
+# key: vd
+# --
+1. **Objective**:
+
+   - Ensure each term is defined with multiple concise, flashcard-friendly definitions. Use the format: *Category: Definition*. Provide diverse perspectives and aspects of the term.
+   - Create focused flashcards that elicit the answer *`(current-kill 0)`* with clarity and precision.
+   - Keep definitions short, precise, and easy to remember. Avoid unnecessary complexity.
+
+2. **Answer Type**:
+
+   - Identify the nature of *`(current-kill 0)`* (e.g., single word, phrase, symbol) and specify its type within the format for accuracy.
+
+---
+
+1. **Core Linguistic Elements**
+   - **Content Words**:
+
+     - **Noun**: *Noun: Definition of `(current-kill 0)`.*
+       *(e.g., Noun: A person who teaches students → teacher)*
+     - **Verb**: *Verb: Definition of `(current-kill 0)`.*
+       *(e.g., Verb: To move through water using arms and legs → swim)*
+     - **Adjective**: *Adjective: Full of energy → energetic.*
+     - **Adverb**: *Adverb: In a careful way → carefully.*
+
+   - **Functional Words**:
+
+     - **Pronoun**: *Pronoun: Replaces a noun → he.*
+     - **Preposition**: *Preposition: Indicates location → under.*
+     - **Conjunction**: *Conjunction: Joins clauses → and.*
+     - **Determiner**: *Determiner: Specifies a noun → the.*
+     - **Modal Verb**: *Modal Verb: Expresses possibility → can.*
+     - **Interjection**: *Interjection: An exclamation → wow.*
+
+   - **Semantic Relationships**:
+
+     - **Synonym**: *Synonym: A word with a similar meaning → happy → joyful.*
+     - **Antonym**: *Antonym: A word with the opposite meaning → happy → sad.*
+     - **Homonym**: *Homonym: A word with the same spelling but different meaning → bank → riverbank, financial institution.*
+
+---
+
+2. **Combination and Structural Constructs**
+   - **Phrases**:
+
+     - **Noun Phrase**: *Noun Phrase: A wooden structure over water → wooden bridge.*
+     - **Verb Phrase**: *Verb Phrase: To make a decision → make up one’s mind.*
+     - **Adjective Phrase**: *Adjective Phrase: Very tired → completely exhausted.*
+     - **Adverb Phrase**: *Adverb Phrase: With great care → very carefully.*
+     - **Prepositional Phrase**: *Prepositional Phrase: Indicating position → on top of.*
+
+   - **Clauses**:
+
+     - **Independent Clause**: *Independent Clause: Can stand alone → I went home.*
+     - **Dependent Clause**: *Dependent Clause: Cannot stand alone → because it was raining.*
+
+---
+
+3. **Contextual and Idiomatic Constructs**
+   - **Idiomatic Expressions**:
+
+     - **Idiom**: *Idiom: To quit something → throw in the towel.*
+     - **Phrasal Verb**: *Phrasal Verb: To take care of → look after.*
+     - **Collocation**: *Collocation: Words frequently appearing together → heavy rain.*
+
+   - **Proverbs and Fixed Expressions**:
+
+     - **Proverb**: *Proverb: A short saying expressing wisdom → a stitch in time saves nine.*
+     - **Fixed Expression**: *Fixed Expression: An unchanging phrase → for what it's worth.*
+
+   - **Semantic and Contextual**:
+
+     - **Metaphor**: *Metaphor: A comparison without "like" or "as" → time is a thief.*
+     - **Simile**: *Simile: A comparison using "like" or "as" → as brave as a lion.*
+
+---
+
+4. **Meta-Linguistic and Modern Forms**
+   - **Meta-Linguistic**:
+
+     - **Punctuation Mark**: *Punctuation Mark: Definition not applicable to `(current-kill 0)`.*
+     - **Symbol**: *Symbol: Definition not applicable to `(current-kill 0)`.*
+
+   - **Modern Communication**:
+
+     - **Emoji/Emoticon**: *Emoji: Expresses happiness → 😊.*
+     - **Hashtag**: *Hashtag: A keyword preceded by # → #motivation.*
+     - **Meme**: *Meme: A humorous image or text spread online → grumpy cat.*
+
+---
+
+**Guidance for Flashcard Creation**
+
+- **Identify Multiple Meanings**: Recognize and list all possible meanings of *`(current-kill 0)`*.
+- **Determine Part of Speech or Type**: Classify *`(current-kill 0)`* correctly based on its usage and the categories provided.
+- **Clarify Context and Nuances**: Distinguish *`(current-kill 0)`* from similar terms, providing context and justification.
+- **Formulate Flashcards**: Create concise, specific flashcards for each meaning, ensuring clarity and grammatical correctness.
+- **Ensure Clarity and Precision**: Each flashcard should be unambiguous, grammatically correct, and precisely capture *`(current-kill 0)`*'s definition and nuances.
+- **Use Capitalization Correctly**: Apply capitalization based on standard grammatical rules.
+- **Minimize Punctuation**: Use punctuation only when necessary for clarity.

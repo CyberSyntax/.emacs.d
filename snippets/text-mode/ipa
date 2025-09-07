@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: IPA Transcription
+# key: ipa
+# --
+The International Phonetic Alphabet (IPA) transcription of the word "`(current-kill 0)`" in Standard American English. Present the transcription using standard conventions and without introducing alternative variants unless the word is known to have regionally recognized exceptions that require explicit mention. Although I am a linguist, do not include explanations of the IPA symbols themselves (e.g., what each symbol represents, how it is articulated). Instead, enrich the response by detailing any relevant linguistic or contextual factors that may influence the transcription in standard practice (such as syllable structure, stress placement, or morphological considerations), but refrain from describing the symbols’ basic properties. Include only one authoritative transcription unless a well-documented, standard exception exists.

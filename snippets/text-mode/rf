@@ -1,0 +1,22 @@
+# -*- mode: snippet -*-
+# name: Revise an existing flashcard
+# key: rf
+# --
+Original Flashcard Front: ${1:Flashcard Type}: ${2:Original Flashcard Front}
+Original Flashcard Back: ${3:Original Flashcard Back}
+Target Flashcard Back: ${4:Target Flashcard Back}
+
+Task: Revise an existing flashcard to elicit the "Target Flashcard Back" ("$4") instead of the "Original Flashcard Back" ("$3"). **Do not simply ask for the differences between "$3" and "$4".** Instead, modify the "Original Flashcard Front" ("$2") by incorporating the *entire* text of "$3" as an integral part of the new Flashcard Front.
+
+**Crucially, the revised front must:**
+
+1. **Exclude "$3" as an answer:** Make "$3" a given premise, thus removing it as a possible response.
+2. **Necessitate retrieval of "$4":** Force the recall of the more detailed information in "$4".
+3. **Imply distinctions between "$3" and "$4":** The process of building upon "$3" to reach "$4" should highlight their differences.
+4. **Maintain context:** Keep a logical connection to the original concept.
+5. **Be ruthless with brevity:** Be extremely, extremely concise. *Maximum* compression.
+
+Instruction: **Transform** the original Flashcard Front ("**$2**") into a **concise definition**. **Absolutely no question words or interrogative structures allowed.** This definition **must** then **directly imply** the target word, "**$4**," as the **only** logical Flashcard Back. Assume the user understands they should **not** simply repeat "**$3**". **Every single word must be essential.**
+
+Revised Flashcard Front: `(current-kill 0)`: [...]
+Revised Flashcard Back: $4

@@ -1,0 +1,326 @@
+# -*- mode: snippet -*-
+# name: ZFC-Based SAT/Anki Prompt
+# key: zfc
+# --
+## **ZFC-Based Prompt for SAT and Anki**
+
+---
+
+### **Objective**
+
+Transform the provided **Input** into a corresponding **Output** by performing a step-by-step derivation strictly adhering to the **Zermelo–Fraenkel set theory (ZFC)** axioms and logical equivalences. The solution must completely eliminate natural language, except for the **verbatim inclusion of the Input** at the start of the Output. All reasoning must be formalized in terms of **sets, logical operations, and mathematical symbols**.
+
+---
+
+### **Input:**  
+${1:Enter the problem statement here.}
+
+---
+
+### **Instructions**
+
+1. **Preserve the Input Verbatim:**
+   - The **Input** must be included exactly as provided in the **Output**.
+   - Do not alter, paraphrase, or modify the Input in any way.
+
+2. **Set-Theoretic Representation:**
+   - Reframe the problem using **set-builder notation** and logical constructs.  
+   Example:  
+   \\[
+   \\{x \\in \\mathbb{R} \\mid P(x)\\}
+   \\]
+
+3. **Logical Progression:**
+   - Break down the derivation into the smallest logical steps.  
+   - Each step must either directly invoke a ZFC axiom, use logical equivalence, or perform a transformation justified by standard mathematical principles.  
+   - Skip no intermediate steps.
+
+4. **Mathematical Symbols Only:**
+   - Eliminate all natural language in the derivation process.
+   - Use formal notation exclusively (\\(\\forall, \\exists, \\wedge, \\vee, \\in, \\subseteq, \\cup, \\cap, \\emptyset, =, \\neq\\)).
+
+5. **Formatting for Clarity:**
+   - Each step must be encapsulated in a standalone LaTeX math environment (`\\[ ... \\]`).
+   - Do not use alignment environments or multiline formatting.
+
+6. **Output Structure:**
+   - Clearly separate each transformation step using `\\[ ... \\]`. Each transformation must be independent and clearly follow from the prior step.
+
+---
+
+### **Examples**
+
+---
+
+### **Example 1: Solve \\(3(5x - 2) = 5(3x - 1)\\)**
+
+**Input:**  
+Solve \\(3(5x - 2) = 5(3x - 1)\\).  
+
+**Output:**
+\\[
+\\text{Solve \\(3(5x - 2) = 5(3x - 1)\\).}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid 3(5x - 2) = 5(3x - 1)\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid 15x - 6 = 15x - 5\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid 15x - 15x = -5 + 6\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid 0 = 1\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\emptyset
+\\]
+
+---
+
+### **Example 2: Solve \\(x^2 - 5x + 6 = 0\\)**
+
+**Input:**  
+Solve \\(x^2 - 5x + 6 = 0\\).  
+
+**Output:**  
+\\[
+\\text{Solve \\(x^2 - 5x + 6 = 0\\).}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid x^2 - 5x + 6 = 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid x^2 - 2x - 3x + 6 = 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid (x^2 - 2x) + (-3x + 6) = 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid x(x - 2) - 3(x - 2) = 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid (x - 2)(x - 3) = 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid (x - 2) = 0 \\vee (x - 3) = 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in \\mathbb{R} \\mid x = 2 \\vee x = 3\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{2, 3\\}
+\\]
+
+---
+
+### **Example 3: Area Problem**
+
+**Input:**  
+A rectangular room has an area of 135 square feet. One side of the room is 6 feet longer than the other. What is the length of the longer side?  
+
+**Output:**  
+\\[
+\\text{A rectangular room has an area of 135 square feet. One side of the room is 6 feet longer than the other. What is the length of the longer side?}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid \\exists x \\in \\mathbb{R}^+ \\, (x \\cdot y = 135) \\wedge (y = x + 6)\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid \\exists x \\in \\mathbb{R}^+ \\, (x \\cdot y = 135) \\wedge (x = y - 6)\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid (y - 6) \\cdot y = 135 \\wedge (y - 6 > 0)\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid y^2 - 6y = 135 \\wedge y - 6 > 0\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid y^2 - 6y - 135 = 0 \\wedge y > 6\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid (y - 15)(y + 9) = 0 \\wedge y > 6\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid y = 15 \\wedge y > 6\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{y \\in \\mathbb{R}^+ \\mid y = 15\\}
+\\]
+
+---
+
+### **Example 4: Prove \\(A \\subseteq B\\) and \\(B \\subseteq C\\) imply \\(A \\subseteq C\\)**
+
+**Input:**  
+Prove: If \\(A \\subseteq B\\) and \\(B \\subseteq C\\), then \\(A \\subseteq C\\).  
+
+**Output:**  
+\\[
+\\text{Prove: If \\(A \\subseteq B\\) and \\(B \\subseteq C\\), then \\(A \\subseteq C\\).}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in U \\mid x \\in A \\Rightarrow x \\in B\\} \\wedge \\{x \\in U \\mid x \\in B \\Rightarrow x \\in C\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in U \\mid x \\in A \\Rightarrow x \\in C\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in U \\mid (x \\in A \\Rightarrow x \\in B) \\wedge (x \\in B \\Rightarrow x \\in C)\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in U \\mid x \\in A \\Rightarrow x \\in C\\}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\{x \\in U \\mid x \\in A \\Rightarrow x \\in C\\} \\equiv A \\subseteq C
+\\]
+\\[
+\\iff 
+\\]
+\\[
+A \\subseteq C
+\\]
+
+---
+
+### **Example 5**
+
+
+**Input:**  
+How many solution(s) does the equation 3(5x - 2)=5(3x - 1) have?
+
+**Output:**  
+\\[
+\\text{How many solution(s) does the equation 3(5x - 2)=5(3x - 1) have?}
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\left| \\{x \\in \\mathbb{R} \\mid 3(5x - 2) = 5(3x - 1)\\} \\right|
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\left| \\{x \\in \\mathbb{R} \\mid 15x - 6 = 15x - 5\\} \\right|
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\left| \\{x \\in \\mathbb{R} \\mid 15x - 15x = -5 + 6\\} \\right|
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\left| \\{x \\in \\mathbb{R} \\mid 0 = 1\\} \\right|
+\\]
+\\[
+\\iff 
+\\]
+\\[
+\\left| \\emptyset \\right|
+\\]
+\\[
+\\iff 
+\\]
+\\[
+0
+\\]
+
+
+---
+
+### **Key Adjustments**
+
+1. **Encapsulation with `\\[ ... \\]`:**  
+   Each derivation step is clearly encapsulated in a standalone math environment for clarity.
+
+2. **Set-Theoretic Precision:**  
+   - Explicit use of **set-builder notation** in all examples ensures consistency with ZFC axioms.
+   - Logical operators (\\(\\wedge, \\vee, \\Rightarrow\\)) are used rigorously.
+
+3. **ZFC-Based Steps:**  
+   - Logical equivalences and ZFC axioms directly justify all transformations.
+   - Additional constraints are explicitly incorporated to ensure rigor.

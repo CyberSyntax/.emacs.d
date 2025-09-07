@@ -1,0 +1,31 @@
+# -*- mode: snippet -*-
+# name: Controlled Curiosity — One-Step Next Questions (bounded inference)
+# key: cc
+# --
+Use the text below as the sole context. Apply constrained inference; ask no questions.
+
+`(current-kill 0)`
+
+Rules:
+- Constrained inference: use only explicit or unambiguous cues; do not invent names, numbers, or user attributes; prefer domain‑neutral phrasing when unsure.
+- Uncertainty handling: if context is short/ambiguous, shrink step size toward 0.25 and keep novelty at the low end of each lane. Allow at most one [assumption] tag (≤5 words) in a rationale when needed; otherwise omit.
+- Defaults if missing: familiarity intermediate; goal apply; principles evidence,effectiveness; depth/breadth 60/40; step size 0.3.
+- Feedback adaptation: if the text includes a chosen question/index, R/N ratings (1–5), boredom/overwhelm notes, principle tweaks, ratio, or step size, adjust novelty accordingly.
+- Language: plain, specific; ≤20-word questions; 1-line rationales naming mechanism or principle fit. Do not echo the context or add preamble.
+- Mechanism diversity: why, how, what‑if, compare, counterexample, transfer, constraint.
+
+Output exactly:
+Near—Depth (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+Near—Breadth (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+Adjacent—Depth (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+Adjacent—Breadth (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+Bridge—Depth (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+Bridge—Breadth (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+Wildcard (optional) (R x.xx, N x.xx): <≤20-word question> — <1-line rationale>
+
+Scoring:
+- Two decimals, 0.00–1.00. Lane calibration: Near R≥0.80 N≤0.30; Adj R 0.60–0.80 N 0.35–0.55; Bridge R 0.50–0.75 N 0.55–0.75.
+- Tune scores with step size: if s>0.3, push N to lane high end; if s<0.3, to low end.
+- Reflect depth/breadth ratio in selection and rationales.
+
+End with: Pick one; optionally rate R,N (1–5) or adjust step size/ratio.$0

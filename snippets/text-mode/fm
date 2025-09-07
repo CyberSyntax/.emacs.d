@@ -1,0 +1,118 @@
+# -*- mode: snippet -*-
+# name: Formal Mathematical Reasoning Prompt
+# key: fm
+# --
+---
+    
+**Objective:**
+    
+Transform the provided **Input** into the corresponding **Output** by performing a step-by-step formal mathematical reasoning process strictly adhering to logical equivalence. The transformation must eliminate all natural language, ensuring that the derivation consists solely of mathematical expressions and logical statements to maintain precision and correctness.
+    
+---
+    
+**Instructions:**
+    
+1. **Exclusively Mathematical Content:**
+   - Present the entire derivation without any natural language explanations.
+   - Use only formal mathematical notation, set theory, and logical symbols.
+   - Avoid any descriptive text or commentary; the output should be purely symbolic.
+    
+2. **Logical Equivalence:**
+   - Ensure that each transformation step is a logical equivalence of the previous step.
+   - Apply rules of logic rigorously, such as implications, substitutions, and simplifications.
+   - Justify each transformation through logical identities or mathematical principles without verbal explanations.
+    
+3. **Step-by-Step Formal Reasoning:**
+   - Decompose the problem into distinct, sequential mathematical steps.
+   - Each step must directly follow from the preceding one through valid logical progression.
+   - Maintain a clear and unambiguous flow of reasoning purely through symbols.
+    
+4. **Symbolic Representation:**
+   - Translate the problem into formal symbolic terms before proceeding with the derivation.
+   - Define variables, equations, and constraints using precise mathematical symbols.
+   - Ensure consistency in the use of variables and notation throughout the derivation.
+    
+5. **Set Notation and Constraints:**
+   - Represent all constraints using set-builder notation with `\left\{`, `\middle|`, and `\right\}` consistently.
+   - Example: `\left\{ x \in \mathbb{R} \;\middle|\; x > 0 \right\}`
+    
+6. **Structured LaTeX Output:**
+   - Format the output using LaTeX, encapsulating the derivation within appropriate environments.
+   - Clearly label each derivation step using alignment environments for readability.
+   - Conclude with the final solution in its simplest and most reduced form.
+    
+7. **Solution Verification:**
+   - Ensure that the final solution satisfies all original equations and inequalities.
+   - Represent the verification process purely through mathematical expressions without narrative.
+    
+---
+    
+**Format Specifications:**
+    
+- **Input:** The original problem statement to be transformed.
+- **Output:** A detailed, structured derivation leading to the solution, formatted using LaTeX without any natural language.
+    
+---
+    
+**Examples:**
+
+**Example 1:**
+    
+### **Input:**
+A rectangular room has an area of 135 square feet. One side of the room is 6 feet longer than the other side. What is the length of the longer side of the room?
+    
+### **Output:**
+\[
+\begin{align*}
+&\text{A rectangular room has an area of 135 square feet. One side of the room is 6 feet longer than the other side. What is the length of the longer side of the room?} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; \exists! \, x \in \mathbb{R}^+ \, \left( y = x + 6 \wedge x \cdot y = 135 \right) \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; \exists! \, x \in \mathbb{R}^+ \, \left( x = y - 6 \wedge x \cdot y = 135 \right) \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; \exists! \, x \in \mathbb{R}^+ \, \left( x = y - 6 \wedge (y - 6) \cdot y = 135 \right) \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; y > 6 \wedge (y - 6) \cdot y = 135 \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; y > 6 \wedge y^2 - 6y = 135 \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; y > 6 \wedge y^2 - 6y - 135 = 0 \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; y > 6 \wedge (y - 15)(y + 9) = 0 \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; y > 6 \wedge y = 15 \right\\} \\\\
+\iff \quad & \left\\{ y \in \mathbb{R}^+ \;\middle|\; y = 15 \right\\}
+\end{align*}
+\]
+
+**Example 2:**
+
+### **Input:**
+How many solution(s) does the equation 3(5x - 2) = 5(3x - 1) have?
+    
+### **Output:**
+\[
+\begin{align*}
+&\text{How many solution(s) does the equation }3(5x - 2)=5(3x - 1)\text{ have?}\\\\
+\iff
+&\Bigl|\left\\{\,x \in \mathbb{R}\;\middle|\;3\!\bigl(5x - 2\bigr)=5\!\bigl(3x - 1\bigr)\right\\}\Bigr|\\\\
+\iff
+&\Bigl|\left\\{\,x \in \mathbb{R}\;\middle|\;15x - 6=15x - 5\right\\}\Bigr|\\\\
+\iff
+&\Bigl|\left\\{\,x \in \mathbb{R}\;\middle|\;-6=-5\right\\}\Bigr|\\\\
+\iff
+&\Bigl|\varnothing\Bigr|\\\\
+&=0
+\end{align*}
+\]
+
+---
+    
+**Task:**
+    
+Using the guidelines and format provided above, transform the following **Input** into the corresponding **Output** by performing a detailed, step-by-step formal mathematical reasoning process strictly through logical equivalence without any natural language.
+    
+### **Input:**
+    
+`(current-kill 0)`
+    
+---
+    
+**Notes:**
+    
+- Ensure all mathematical expressions are properly formatted using LaTeX syntax.
+- **Strictly exclude all natural language from the output. Focus solely on logical equivalence and mathematical expressions to maintain the precision and correctness of the derivation.**
+- Utilize `\left\{`, `\middle|`, and `\right\}` consistently in all set definitions to adhere to the highest standards of mathematical notation.
+$0

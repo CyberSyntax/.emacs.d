@@ -1,0 +1,136 @@
+# -*- mode: snippet -*-
+# name: Flashcard Creation
+# key: fc
+# --
+
+1. **Objective**:
+   - Transform the provided content *`(current-kill 0)`* into clear, context-rich flashcards that elicit precise, dictionary-entry-level answers.
+
+2. **Answer Type**:
+
+   - **Ensure answers are dictionary-entry-level**: single terms, proper nouns, or recognized lexical phrases. Avoid full sentences, verbose explanations, or any prohibited answer types.
+
+   **A. Acceptable Answer Types**:
+
+      - **Single Terms**: Individual words or concise phrases found as entries in a dictionary.
+      - **Proper Nouns**: Specific names of people, places, organizations, etc.
+      - **Recognized Lexical Phrases**: Idioms, collocations, or established expressions with a fixed meaning.
+
+   **B. Prohibited Answer Types (Avoid in Answers)**:
+
+      1. **Infinitive Phrases (to + verb)**:
+         - *Examples to Avoid*: "to explain the behavior", "to understand the concept"
+         - *Issue*: These phrases are incomplete ideas and create ambiguity.
+
+      2. **Prepositional Phrases**:
+         - *Examples to Avoid*: "in 1905", "about quantum mechanics"
+         - *Issue*: They lack a complete concept and depend on additional context.
+
+      3. **Participial Phrases (-ing or -ed forms)**:
+         - *Examples to Avoid*: "explaining the theory", "discovered in 1898"
+         - *Issue*: These are fragmentary and rely on missing elements.
+
+      4. **Appositive Phrases**:
+         - *Examples to Avoid*: "a scientist, Einstein", "the theory, relativity"
+         - *Issue*: They restate or obscure the core concept and can introduce ambiguity.
+
+      5. **Relative Clause Fragments**:
+         - *Examples to Avoid*: "which was revolutionary", "who developed the theory"
+         - *Issue*: They are incomplete and cannot stand alone.
+
+      6. **Ambiguous Noun or Adjective Phrases**:
+         - *Examples to Avoid*: "detailed information", "complex systems"
+         - *Issue*: They lack specificity and completeness.
+
+3. **Clarity and Precision**:
+
+   - **Ensure Questions Are Clear and Specific**:
+     - Each question must be self-contained, providing all necessary context extracted from *`(current-kill 0)`*.
+     - Questions should lead directly to a single, precise answer.
+
+   - **Avoid Ambiguity**:
+     - Do not use vague language or structures that could elicit multiple answers.
+     - Ensure that each question targets a unique aspect of the content.
+
+4. **Guidelines for Creating Effective Flashcards**:
+
+   - **Contextual Independence**:
+     - Each question must stand alone and be understood without relying on external information.
+     - Do not assume prior knowledge or require other flashcards to understand the question.
+
+   - **Crafting Precise Questions**:
+     - Use clear and direct language to target specific information.
+     - Focus on different facets (who, what, when, where, why, how) to cover various aspects of the content.
+
+   - **Producing Acceptable Answers**:
+     - Answers must be concise and fit within the acceptable types.
+     - Strictly avoid all prohibited answer types.
+
+5. **Process for Creating Flashcards**:
+
+   - **Step 1: Identify Key Concepts in *`(current-kill 0)`***:
+     - Carefully read the provided content.
+     - Extract significant facts, definitions, names, dates, and concepts suitable for flashcards.
+
+   - **Step 2: Formulate Precise Questions**:
+     - For each key concept, create a question that uniquely targets that information.
+     - Ensure questions are clear, specific, and unambiguous.
+
+   - **Step 3: Provide Acceptable Answers**:
+     - Ensure answers are dictionary-entry-level, adhering to acceptable types.
+     - Avoid all prohibited answer types.
+
+6. **Examples**:
+
+   **Original Content (`(current-kill 0)`):**
+
+   "Marie Curie discovered radium and polonium in 1898, significantly advancing the study of radioactivity."
+
+   **Correct Flashcards**:
+
+   1. **Q:** *Which scientist discovered radium and polonium in 1898?*
+      - **A:** *Marie Curie*
+      - *Justification:* The question is specific and leads directly to the proper noun "Marie Curie," an acceptable answer type.
+
+   2. **Q:** *What elements did Marie Curie discover in 1898?*
+      - **A:** *Radium and polonium*
+      - *Justification:* The question targets specific elements, and the answer consists of proper nouns.
+
+   3. **Q:** *In what year did Marie Curie discover radium and polonium?*
+      - **A:** *1898*
+      - *Justification:* The question seeks a specific year, and the answer is a single term.
+
+   4. **Q:** *Which field of science was advanced by Marie Curie's discoveries?*
+      - **A:** *Radioactivity*
+      - *Justification:* The question asks for a field of study, and the answer is an acceptable single-term noun.
+
+   **Incorrect Flashcards (Prohibited Answer Types)**:
+
+   1. **Q:** *Why did Marie Curie become famous?*
+      - **A:** *For discovering radium and polonium*
+      - *Issue:* The answer is a **prepositional phrase** starting with "For," which is prohibited.
+
+   2. **Q:** *Marie Curie, a pioneer in science, discovered what?*
+      - **A:** *Radium and polonium*
+      - *Issue:* The question contains an **appositive phrase** ("a pioneer in science"), which can introduce ambiguity.
+
+   3. **Q:** *Radium and polonium were discovered by whom?*
+      - **A:** *By Marie Curie*
+      - *Issue:* The answer includes a **prepositional phrase** ("By Marie Curie"), which is prohibited. The acceptable answer is "Marie Curie."
+
+7. **Final Prompt**
+
+   Transform the provided content *`(current-kill 0)`* into clear, context-rich flashcards by:
+
+   - **Creating Precise Questions**:
+     - Formulate self-contained, unambiguous questions that directly elicit the intended answer.
+     - Include all necessary context within the question.
+
+   - **Providing Acceptable Answers**:
+     - Ensure answers are concise and fall under acceptable types: single terms, proper nouns, or recognized lexical phrases.
+     - Strictly avoid all prohibited answer types.
+
+   - **Ensuring Quality and Cohesion**:
+     - Review each question and answer pair to ensure they adhere to these guidelines.
+     - Maintain consistency in formatting and style throughout the flashcards.
+     - Focus on clarity, precision, and adherence to the acceptable answer types to create high-quality study materials.
