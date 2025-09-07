@@ -45,6 +45,7 @@
 (require 'init-gptel)
 (require 'init-ui)
 (require 'init-org)
+(require 'init-android)
 
 ;; ===================================================================
 ;; Load Vendor Packages

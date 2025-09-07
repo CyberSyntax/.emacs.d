@@ -16,6 +16,7 @@
                      ("https://github.com/CyberSyntax/org-story.git" . "org-story")
                      ("https://github.com/CyberSyntax/hanja-reading.git" . "hanja-reading")
                      ("https://github.com/CyberSyntax/org-headline-manager.git" . "org-headline-manager")
+                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")
                      ))
     (update-frequency . daily)
     (auto-compile . t)
