@@ -9,17 +9,22 @@ This guide outlines the essential steps to make the Native Android Emacs app use
 
 ### Step 1: Prepare Termux and Clone the Configuration
 
-First, grant Termux access to shared storage, then clone this repository into the standard `Documents` folder.
+First, grant Termux access to shared storage, then navigate to your `Documents` folder and clone this repository.
 
 1.  In Termux, run the one-time setup command:
     ```bash
     termux-setup-storage
     ```
-    (A system dialog will pop up. You must **Allow** it.)
+    (A system dialog will pop up asking for permission. You must **Allow** it.)
 
-2.  Clone the repository into your shared `Documents` folder:
+2.  Navigate into your shared `Documents` folder:
     ```bash
-    git clone https://github.com/CyberSyntax/.emacs.d.git ~/storage/shared/Documents/.emacs.d
+    cd ~/storage/shared/Documents
+    ```
+
+3.  Clone the repository. Git will automatically create the `.emacs.d` directory here.
+    ```bash
+    git clone https://github.com/CyberSyntax/.emacs.d.git
     ```
 
 ### Step 2: Create the Native Emacs Bootstrap File
