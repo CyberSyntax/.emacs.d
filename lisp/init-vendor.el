@@ -2,6 +2,7 @@
 
 ;;; Enhanced Vendor Package Manager with Smart Dependency Resolution
 ;;; Cross-platform, dependency-aware compilation system
+;;; Modified for pure-Emacs raw file downloads (no external tools) on Android
 
 (defvar my-vendor-autonomous-config
   '((cache-file . "vendor-cache.json")
@@ -278,7 +279,6 @@
         (or (not cache-files-exist)
             (> source-newest cache-newest)))))
 
-;; [Previous helper functions remain the same: probe-capability, discover-environment, etc.]
 (defun my-vendor-probe-capability (test-name test-function)
   "Probe a capability using TEST-FUNCTION, cache result under TEST-NAME."
   (or (cdr (assoc test-name my-vendor-runtime-data))
@@ -329,9 +329,9 @@
     (let ((git-ok (cdr (assoc 'git-functional env-data)))
           (network-ok (cdr (assoc 'network-available env-data)))
           (fs-writable (cdr (assoc 'filesystem-writable env-data))))
-      
       (cond
        ((and git-ok network-ok fs-writable) 'git-update)
+       ((and (string= system-type "android") network-ok fs-writable) 'download-raw)  ; Raw download ONLY on Android if Git fails
        ((not fs-writable) 'readonly)
        (t 'fallback)))))
 
@@ -386,6 +386,119 @@
        (message "  ✗ Git operation failed for %s: %s" repo-url (error-message-string err))
        nil))))
 
+(defun my-vendor-extract-owner-repo (repo-url)
+  "Extract 'owner/repo' from REPO-URL (e.g., 'https://github.com/owner/repo.git' -> 'owner/repo')."
+  (let ((clean-url (replace-regexp-in-string "\\.git$" "" repo-url)))
+    (if (string-match "github\\.com/\\(.*\\)" clean-url)
+        (match-string 1 clean-url)
+      (error "Invalid GitHub URL: %s" repo-url))))
+
+(defun my-vendor-fetch-latest-commit-sha (owner-repo)
+  "Fetch the latest commit SHA for OWNER-REPO's main branch from GitHub API."
+  (let* ((api-url (format "https://api.github.com/repos/%s/commits/main" owner-repo))
+         (buffer (url-retrieve-synchronously api-url))
+         (json nil))
+    (when buffer
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (when (re-search-forward "^\r?\n\r?\n" nil t)  ; Skip headers
+          (setq json (json-parse-string (buffer-substring-no-properties (point) (point-max))
+                                        :object-type 'alist))))
+      (kill-buffer buffer))
+    (if json
+        (alist-get 'sha json)
+      (error "Failed to fetch commit SHA for %s (rate limit or network issue?)" owner-repo))))
+
+(defun my-vendor-get-local-sha (repo-dir)
+  "Get the stored local SHA from REPO-DIR's last-sha.txt, or nil if missing."
+  (let ((sha-file (expand-file-name "last-sha.txt" repo-dir)))
+    (when (file-exists-p sha-file)
+      (with-temp-buffer
+        (insert-file-contents sha-file)
+        (string-trim (buffer-string))))))
+
+(defun my-vendor-update-local-sha (repo-dir new-sha)
+  "Update the last-sha.txt in REPO-DIR with NEW-SHA."
+  (let ((sha-file (expand-file-name "last-sha.txt" repo-dir)))
+    (with-temp-file sha-file
+      (insert new-sha))))
+
+(defun my-vendor-fetch-github-tree (owner-repo)
+  "Fetch recursive file tree from GitHub API for OWNER-REPO's main branch."
+  (let* ((api-url (format "https://api.github.com/repos/%s/git/trees/main?recursive=1" owner-repo))
+         (buffer (url-retrieve-synchronously api-url))
+         (json nil))
+    (when buffer
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (when (re-search-forward "^\r?\n\r?\n" nil t)  ; Skip headers
+          (setq json (json-parse-string (buffer-substring-no-properties (point) (point-max))
+                                        :object-type 'alist :array-type 'list))))
+      (kill-buffer buffer))
+    (if (and json (alist-get 'tree json))
+        (alist-get 'tree json)
+      (error "Failed to fetch tree for %s (rate limit?)" owner-repo))))
+
+(defun my-vendor-download-raw-file (owner-repo path local-file)
+  "Download raw file content from GitHub for OWNER-REPO's PATH to LOCAL-FILE."
+  (let ((raw-url (format "https://raw.githubusercontent.com/%s/main/%s" owner-repo path)))
+    (with-temp-buffer
+      (condition-case err
+          (progn
+            (url-insert-file-contents raw-url)
+            (write-region (point-min) (point-max) local-file nil 'silent)
+            t)
+        (error
+         (message "  ✗ Failed to download %s: %s" path (error-message-string err))
+         nil)))))
+
+(defun my-vendor-execute-raw-download (repo-url repo-dir)
+  "Download raw files for REPO-URL into REPO-DIR if validation shows an update is needed."
+  (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
+         (local-sha (my-vendor-get-local-sha repo-dir))
+         (remote-sha (condition-case err
+                         (my-vendor-fetch-latest-commit-sha owner-repo)
+                       (error
+                        (message "  ✗ SHA fetch failed for %s: %s - Skipping update" owner-repo (error-message-string err))
+                        nil))))
+    (if (and remote-sha
+             (or (null local-sha) (not (string= local-sha remote-sha))))
+        (condition-case err
+            (progn
+              ;; Delete existing repo dir for clean slate
+              (when (file-directory-p repo-dir)
+                (delete-directory repo-dir t t)
+                (message "  Deleted old repo: %s" repo-dir))
+              
+              ;; Fetch tree
+              (message "Fetching file tree for %s..." owner-repo)
+              (let ((tree (my-vendor-fetch-github-tree owner-repo))
+                    (file-count 0))
+                (dolist (item tree)
+                  (let ((path (alist-get 'path item))
+                        (type (alist-get 'type item)))
+                    (cond
+                     ((string= type "tree")  ; Directory
+                      (make-directory (expand-file-name path repo-dir) t))
+                     ((string= type "blob")  ; File
+                      (let ((local-file (expand-file-name path repo-dir)))
+                        (when (my-vendor-download-raw-file owner-repo path local-file)
+                          (setq file-count (1+ file-count))))))))
+                
+                (if (> file-count 0)
+                    (progn
+                      (my-vendor-update-local-sha repo-dir remote-sha)
+                      (message "  ✓ Downloaded %d files to %s (updated to SHA %s)" file-count repo-dir (substring remote-sha 0 7))
+                      t)
+                  (message "  ✗ No files downloaded for %s" owner-repo)
+                  nil)))
+          (error 
+           (message "  ✗ Raw download failed for %s: %s" owner-repo (error-message-string err))
+           nil))
+      (progn
+        (message "  ✓ Skipping download for %s—already up to date (SHA %s)" owner-repo (if local-sha (substring local-sha 0 7) "none"))
+        t))))  ; Return t to indicate "success" (no update needed)
+
 (defun my-vendor-autonomous-setup ()
   "Enhanced autonomous vendor package setup with smart compilation."
   (let* ((config my-vendor-autonomous-config)
@@ -422,6 +535,17 @@
                       (name (cdr repo))
                       (repo-dir (expand-file-name name vendor-dir)))
                  (when (my-vendor-execute-git-update url repo-dir)
+                   (setq updated-any t))))
+             (when updated-any (my-vendor-mark-updated)))
+         (message "Skipping update - already done today")))
+      ('download-raw
+       (if should-update
+           (progn
+             (dolist (repo repositories)
+               (let* ((url (car repo))
+                      (name (cdr repo))
+                      (repo-dir (expand-file-name name vendor-dir)))
+                 (when (my-vendor-execute-raw-download url repo-dir)
                    (setq updated-any t))))
              (when updated-any (my-vendor-mark-updated)))
          (message "Skipping update - already done today")))
