@@ -11,8 +11,13 @@
 (unless (file-directory-p my-var-directory)
   (make-directory my-var-directory t))
 
+;; Pre-create commonly used subdirectories under var/
+(dolist (sub '("cache/" "auto-save-list/sessions/" "auto-save-list/backups/"))
+  (make-directory (expand-file-name sub my-var-directory) t))
+
 (setq auto-save-list-file-prefix (expand-file-name "auto-save-list/sessions/" my-var-directory)
-      auto-save-file-name-transforms `((".*" ,(expand-file-name "auto-save-list/backups/" my-var-directory) t)))
+      auto-save-file-name-transforms
+      `((".*" ,(expand-file-name "auto-save-list/backups/" my-var-directory) t)))
 
 ;; ===================================================================
 ;; Global Settings (Set Before Loading Modules)
@@ -40,20 +45,21 @@
 ;; Load Modules
 ;; ===================================================================
 
-;; 1. Load the main package management system first (sets proxies, mirrors, etc.)
+;; 1) Package/bootstrap first (sets mirrors, ensures use-package, etc.)
 (require 'init-packages)
 
-;; 2. Load and execute the vendor package manager.
+;; 2) Vendor manager (GitHub repos). Then RUN it now so vendor libs are present.
 (require 'init-vendor)
+(my-vendor-autonomous-setup)
 
-;; 3. Load personal configuration modules.
+;; 3) Personal modules
 (require 'init-gptel)
 (require 'init-ui)
 (require 'init-org)
 (require 'init-android)
 
 ;; ===================================================================
-;; Load Vendor Packages
+;; Load Vendor Packages (optional; only if present)
 ;; ===================================================================
 
 (defun require-if-available (feature &optional filename)
