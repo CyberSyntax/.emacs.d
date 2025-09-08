@@ -13,11 +13,6 @@
       (apply orig-fn args)))
   (advice-add 'org-element-at-point :around #'my-org-element-at-point-advice))
 
-;; Ensure Org Mode is installed from GNU ELPA
-(unless (package-installed-p 'org)
-  (package-refresh-contents)
-  (package-install 'org))
-
 ;; Configure Org Mode
 (use-package org
   :ensure t

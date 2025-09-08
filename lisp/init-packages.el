@@ -20,7 +20,7 @@
 (setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
 
 ;; Keep network waits short so init won't block too long.
-(defvar my/url-request-timeout 10
+(defvar my/url-request-timeout 8
   "Seconds to wait on a single HTTP(S) request before timing out.")
 (setq url-request-timeout my/url-request-timeout)
 
@@ -54,7 +54,7 @@
       (push (cons "no_proxy" no) url-proxy-services))))
 (my/setup-proxy-from-env)
 
-;; Connectivity and ELPA mirror selection
+;; Connectivity probe (kept for diagnostics; no longer gates mirror selection)
 (defun my/network-online-p ()
   "Quickly check if the network is reachable."
   (let ((url-request-timeout my/url-request-timeout))
@@ -118,27 +118,29 @@
     (nreverse chosen)))
 
 (defun my/bootstrap-package-archives ()
-  "Set `package-archives` to first working mirrors and set priorities."
-  (if (not my/network-allowed)
+  "Set `package-archives` to the first working mirrors and set priorities."
+  (let ((selected (my/select-elpa-mirrors)))
+    (if selected
+        (progn
+          (setq package-archives selected)
+          (setq package-archive-priorities
+                (let (prio)
+                  (dolist (p '(("gnu" . 20)
+                               ("nongnu" . 15)
+                               ("melpa" . 10)
+                               ("melpa-stable" . 8)))
+                    (when (assoc (car p) selected)
+                      (push p prio)))
+                  (nreverse prio))))
       (setq package-archives nil)
-    (let ((selected (my/select-elpa-mirrors)))
-      (setq package-archives selected)
-      (setq package-archive-priorities
-            (let (prio)
-              (dolist (p '(("gnu" . 20)
-                           ("nongnu" . 15)
-                           ("melpa" . 10)
-                           ("melpa-stable" . 8)))
-                (when (assoc (car p) selected)
-                  (push p prio)))
-              (nreverse prio))))))
+      (message "No ELPA mirrors reachable; operating without package archives."))))
 
 (defun my/package-refresh-archives-with-fallback (&optional timeout)
   "Refresh archives once using selected mirrors."
   (let ((url-request-timeout (or timeout my/url-request-timeout)))
     (condition-case err
         (progn
-          (when (and my/network-allowed (null package-archives))
+          (when (null package-archives)
             (my/bootstrap-package-archives))
           (when package-archives
             (package-refresh-contents)))
@@ -183,7 +185,7 @@
   "Ensure `use-package` is available. Install or stub."
   (or (require 'use-package nil 'noerror)
       (progn
-        (when (and my/network-allowed package-archives)
+        (when package-archives
           (let ((url-request-timeout my/url-request-timeout))
             (ignore-errors
               (unless package-archive-contents
@@ -208,14 +210,14 @@
               t)))))
 (my/ensure-use-package)
 
-(setq use-package-always-ensure (and my/network-allowed t))
+(setq use-package-always-ensure (and package-archives t))
 
 (with-eval-after-load 'use-package
   (when (fboundp 'use-package-ensure-elpa)
     (defun my/around-use-package-ensure-elpa (orig name ensure state &optional no-refresh)
-      (if (not my/network-allowed)
+      (if (not package-archives)
           (progn
-            (message "use-package: skipping ensure for %s (offline)" name)
+            (message "use-package: skipping ensure for %s (no reachable package archives)" name)
             t)
         (condition-case err
             (funcall orig name ensure state no-refresh)

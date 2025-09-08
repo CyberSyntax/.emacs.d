@@ -34,12 +34,11 @@
 ;; Load Modules
 ;; ===================================================================
 
-;; 1. Load and execute the vendor package manager first.
-(require 'init-vendor)
-(my-vendor-autonomous-setup)
-
-;; 2. Load the main package management system.
+;; 1. Load the main package management system first (sets proxies, mirrors, etc.)
 (require 'init-packages)
+
+;; 2. Load and execute the vendor package manager.
+(require 'init-vendor)
 
 ;; 3. Load personal configuration modules.
 (require 'init-gptel)
@@ -51,10 +50,17 @@
 ;; Load Vendor Packages
 ;; ===================================================================
 
-(require 'org-headline-manager)
-(require 'hanja-reading)
-(require 'org-queue)
-(require 'org-story)
+(defmacro require-if-available (feature &optional filename)
+  `(let ((lib (or ,filename (symbol-name ',feature))))
+     (if (locate-library lib)
+         (require ',feature)
+       (message "Skipped require %s (not installed yet)" ',feature)
+       nil)))
+
+(require-if-available 'org-headline-manager)
+(require-if-available 'hanja-reading)
+(require-if-available 'org-queue)
+(require-if-available 'org-story)
 
 ;; ===================================================================
 ;; Final Steps
