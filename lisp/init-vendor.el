@@ -17,12 +17,14 @@
     (repositories . (;; Third-party vendor packages
                      ("https://github.com/bohonghuang/org-srs.git" . "org-srs")
                      ("https://github.com/open-spaced-repetition/lisp-fsrs.git" . "fsrs")
+                     
                      ;; My GitHub packages
                      ("https://github.com/CyberSyntax/org-queue.git" . "org-queue")
                      ("https://github.com/CyberSyntax/org-story.git" . "org-story")
                      ("https://github.com/CyberSyntax/hanja-reading.git" . "hanja-reading")
                      ("https://github.com/CyberSyntax/org-headline-manager.git" . "org-headline-manager")
-                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")))
+                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")
+                     ))
     (update-frequency . daily)
     (auto-compile . t)
     (compile-strategy . smart)
@@ -168,20 +170,14 @@
   "Smart compilation with dependency resolution."
   (let* ((cache-dir (my-vendor-get-compile-cache-dir repo-name))
          (config my-vendor-autonomous-config)
-         (auto-compile (cdr (assoc 'auto-compile config)))
-         (strategy (cdr (assoc 'compile-strategy config)))
-         (warning-level (cdr (assoc 'compilation-warnings config))))
+         (auto-compile (cdr (assoc 'auto-compile config))))
     (unless auto-compile
       (message "Auto-compilation disabled, using source files for %s" repo-name)
       (cl-return-from my-vendor-compile-package-smart source-dir))
     (message "Smart compilation for %s..." repo-name)
     (message "  Source: %s" source-dir)
     (message "  Cache:  %s" cache-dir)
-    (let ((needs-compile (pcase strategy
-                           ('always t)
-                           ('never nil)
-                           ('smart (my-vendor-needs-compilation-p source-dir cache-dir))
-                           (_ t))))
+    (let ((needs-compile (my-vendor-needs-compilation-p source-dir cache-dir)))
       (if (not needs-compile)
           (progn
             (message "  ✓ Using cached compilation")
@@ -210,13 +206,7 @@
                         (when (my-vendor-ensure-lexical-binding target-el)
                           (message "    Fixed lexical-binding in %s" relative-path))
                         (condition-case compile-err
-                            (let ((byte-compile-error-on-warn (eq warning-level 'strict))
-                                  (byte-compile-warnings 
-                                   (pcase warning-level
-                                     ('none nil)
-                                     ('moderate '(obsolete))
-                                     ('strict t)
-                                     (_ '(obsolete))))
+                            (let ((byte-compile-warnings '(obsolete))
                                   (byte-compile-log-buffer-name "*Vendor Compile Log*"))
                               (if (byte-compile-file target-el)
                                   (progn
@@ -341,7 +331,7 @@
 (defun my-vendor-extract-owner-repo (repo-url)
   "Extract 'owner/repo' from REPO-URL."
   (let ((clean-url (replace-regexp-in-string "\\.git$" "" repo-url)))
-    (if (string-match "github\\.com/\\(.*\\)" clean-url)
+    (if (string-match "github\\.com/\\(.*\\)$" clean-url)
         (match-string 1 clean-url)
       (error "Invalid GitHub URL: %s" repo-url))))
 
@@ -482,8 +472,11 @@
                (let* ((url (car repo))
                       (name (cdr repo))
                       (repo-dir (expand-file-name name vendor-dir)))
-                 (when (my-vendor-execute-git-update url repo-dir)
-                   (setq updated-any t))))
+                 (if (my-vendor-execute-git-update url repo-dir)
+                     (setq updated-any t)
+                   ;; Per-repo fallback: try raw download if git failed
+                   (when (my-vendor-execute-raw-download url repo-dir)
+                     (setq updated-any t)))))
              (when updated-any (my-vendor-mark-updated)))
          (message "Skipping update - already done today")))
       ('download-raw

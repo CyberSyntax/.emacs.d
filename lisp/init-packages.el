@@ -6,10 +6,7 @@
 (require 'url-parse)
 (require 'package)
 
-;; ===================================================================
 ;; Core behavior and directories
-;; ===================================================================
-
 (setq byte-compile-warnings '(not free-vars obsolete))
 (setq load-prefer-newer t)
 (setq package-enable-at-startup nil)
@@ -33,10 +30,7 @@
     (member (downcase v) '("1" "true" "yes" "on")))
   "Non-nil means force offline mode regardless of connectivity check.")
 
-;; ===================================================================
 ;; Proxy support from environment
-;; ===================================================================
-
 (defun my/setup-proxy-from-env ()
   "Configure `url-proxy-services` from *_proxy environment variables."
   (let* ((hp (or (getenv "http_proxy") (getenv "HTTP_PROXY")))
@@ -60,10 +54,7 @@
       (push (cons "no_proxy" no) url-proxy-services))))
 (my/setup-proxy-from-env)
 
-;; ===================================================================
 ;; Connectivity and ELPA mirror selection
-;; ===================================================================
-
 (defun my/network-online-p ()
   "Quickly check if the network is reachable."
   (let ((url-request-timeout my/url-request-timeout))
@@ -155,7 +146,7 @@
        (message "package-refresh-contents suppressed: %s" (error-message-string err))
        nil))))
 
-;; Also suppress any hard error from other code calling `package-refresh-contents`.
+;; Suppress hard errors from any other call to package-refresh-contents
 (defun my/pkg-refresh-contents-suppress-errors (orig-fn &rest args)
   (let ((url-request-timeout my/url-request-timeout))
     (condition-case err
@@ -165,18 +156,12 @@
        nil))))
 (advice-add 'package-refresh-contents :around #'my/pkg-refresh-contents-suppress-errors)
 
-;; ===================================================================
-;; package.el initialization and mirror bootstrap
-;; ===================================================================
-
+;; Initialize package.el and bootstrap archives
 (package-initialize)
 (my/bootstrap-package-archives)
 (my/package-refresh-archives-with-fallback)
 
-;; ===================================================================
 ;; Resilient `use-package` bootstrap (with offline stub)
-;; ===================================================================
-
 (defun my/define-use-package-stub ()
   "Define a minimal `use-package` stub that won't error offline."
   (defvar use-package-always-ensure nil
@@ -239,10 +224,7 @@
            t))))
     (advice-add 'use-package-ensure-elpa :around #'my/around-use-package-ensure-elpa)))
 
-;; ===================================================================
 ;; Packages
-;; ===================================================================
-
 (use-package yasnippet
   :init
   (defcustom my-yas-snippet-dir (expand-file-name "snippets/" user-emacs-directory)
