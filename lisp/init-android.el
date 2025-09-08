@@ -1,8 +1,14 @@
 ;;; lisp/init-android.el --- Android-specific support -*- lexical-binding: t; -*-
 
-;; This entire module is only active when running on Android via Termux.
+;; This module is only active when running in native Android Emacs.
+;; It does NOT assume Termux is present. The vendor system will fetch
+;; the optional 'android-support' package if network allows.
 (when (eq system-type 'android)
-  (require 'android-support))
+  (let ((lib "android-support"))
+    (if (locate-library lib)
+        (require 'android-support)
+      (message "init-android: '%s' not found yet; skipping for now." lib))))
 
 (provide 'init-android)
-;;; init-android.el ends here
+
+;;; lisp/init-android.el ends here

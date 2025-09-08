@@ -1,13 +1,25 @@
-;;; early-init.el --- Bridge to Termux environment for Native Android Emacs -*- lexical-binding: t; -*-
+;;; early-init.el --- Android environment tweaks (no Termux dependency) -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 
-(when (string= system-type "android")
+;; On native Android Emacs, avoid assuming Termux exists.
+;; If Termux is actually installed and its directories are accessible,
+;; we optionally bridge its bin into PATH/exec-path. Otherwise, do nothing.
+(when (eq system-type 'android)
   (let* ((prefix "/data/data/com.termux/files/")
-         (path (expand-file-name "usr/bin" prefix)))
-    (setenv "PREFIX" prefix)
-    (setenv "PATH" (format "%s:%s" (getenv "PATH") path))
-    (setf exec-path (cl-delete-if-not #'file-readable-p exec-path)
-          exec-path (nconc (butlast exec-path) (cons path (last exec-path))))))
+         (bin    (expand-file-name "usr/bin" prefix)))
+    (when (file-accessible-directory-p bin)
+      ;; Export PREFIX only if Termux is present
+      (setenv "PREFIX" prefix)
+      ;; Append Termux bin to PATH if not already present
+      (let* ((current-path (or (getenv "PATH") ""))
+             (parts (split-string current-path path-separator t))
+             (new-path (mapconcat #'identity
+                                  (delete-dups (append parts (list bin)))
+                                  path-separator)))
+        (setenv "PATH" new-path))
+      ;; Clean up exec-path (remove non-existent dirs), then append Termux bin
+      (setq exec-path (cl-remove-if-not #'file-accessible-directory-p exec-path))
+      (add-to-list 'exec-path bin t))))
 
 ;;; early-init.el ends here

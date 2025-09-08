@@ -1,4 +1,16 @@
-;;; lisp/init-vendor.el --- Enhanced vendor manager (missing-repo aware) -*- lexical-binding: t; -*-
+;;; lisp/init-vendor.el --- Cross-platform vendor manager (gitless Android tarball support) -*- lexical-binding: t; -*-
+;;
+;; This vendor manager:
+;; - Updates third-party packages into `lisp/vendor/` either via git or HTTP.
+;; - On native Android (no Termux, no git) it prefers GitHub tarball downloads (no external tools).
+;; - Extracts .tar.gz using Emacs’ auto-compression and a small TAR reader (pure Emacs Lisp).
+;; - Replaces directories atomically and records a hash/commit in last-sha.txt to avoid redundant updates.
+;; - Optionally byte-compiles into a per-platform cache for faster loads.
+;;
+;; Notes:
+;; - We correctly detect Android using (eq system-type 'android).
+;; - If you previously used (string= system-type "android") in other files, change it to (eq system-type 'android).
+;; - No reliance on /data/data/com.termux/...; native Android Emacs generally cannot access Termux paths.
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -6,7 +18,11 @@
 (require 'url)
 (require 'url-parse)
 
-;; User agent and token for GitHub API (optional but helps avoid rate limits)
+;; Ensure we can transparently read .gz files.
+(unless (bound-and-true-p auto-compression-mode)
+  (auto-compression-mode 1))
+
+;; User agent and optional token for GitHub API (helps raise rate limits)
 (defvar my-vendor-user-agent
   (format "Emacs/%s (%s) my-vendor" emacs-version system-type))
 (defvar my-vendor-gh-token
@@ -16,9 +32,9 @@
 ;; Keep network waits short
 (defvar my/vendor-url-timeout 10
   "Seconds to wait on each GitHub API/raw request.")
-
 (setq url-request-timeout my/vendor-url-timeout)
 
+;; Main configuration
 (defvar my-vendor-autonomous-config
   '((cache-file . "vendor-cache.json")
     (vendor-subdir . "lisp/vendor")
@@ -26,27 +42,27 @@
     (repositories . (;; Third-party vendor packages
                      ("https://github.com/bohonghuang/org-srs.git" . "org-srs")
                      ("https://github.com/open-spaced-repetition/lisp-fsrs.git" . "fsrs")
-                     
                      ;; My GitHub packages
                      ("https://github.com/CyberSyntax/org-queue.git" . "org-queue")
                      ("https://github.com/CyberSyntax/org-story.git" . "org-story")
                      ("https://github.com/CyberSyntax/hanja-reading.git" . "hanja-reading")
                      ("https://github.com/CyberSyntax/org-headline-manager.git" . "org-headline-manager")
-                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")
-                     ))
+                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")))
     (update-frequency . daily)
     (auto-compile . t)
     (compile-strategy . smart)
     (fix-lexical-binding . t)
     (handle-dependencies . t)
     (compilation-warnings . moderate))
-  "Enhanced vendor configuration with dependency handling.")
+  "Enhanced vendor configuration with dependency handling and gitless Android fallback.")
 
 (defvar my-vendor-runtime-data nil
   "Runtime data discovered about the environment.")
 
 (defvar my-vendor-force-update nil
   "When non-nil, bypass daily throttle and update now.")
+
+;; ------------------------------ Utilities ------------------------------
 
 (defun my-vendor--json-parse-string (str)
   "Parse JSON STR, returning alist."
@@ -304,12 +320,15 @@
 (defun my-vendor-select-strategy ()
   "Dynamically select the best strategy based on discovered capabilities."
   (let ((env-data (my-vendor-discover-environment)))
-    (let ((git-ok (cdr (assoc 'git-functional env-data)))
-          (network-ok (cdr (assoc 'network-available env-data)))
+    (let ((git-ok      (cdr (assoc 'git-functional env-data)))
+          (network-ok  (cdr (assoc 'network-available env-data)))
           (fs-writable (cdr (assoc 'filesystem-writable env-data))))
       (cond
+       ;; Native Android Emacs: prefer tarball download, no git dependency
+       ((and (eq system-type 'android) network-ok fs-writable) 'download-archive)
        ((and git-ok network-ok fs-writable) 'git-update)
-       ((and network-ok fs-writable) 'download-raw)
+       ;; Prefer archive over raw-tree for general HTTP fallback
+       ((and network-ok fs-writable) 'download-archive)
        ((not fs-writable) 'readonly)
        (t 'fallback)))))
 
@@ -363,6 +382,8 @@
           (insert today))
       (error nil))))
 
+;; ------------------------------ Git path ------------------------------
+
 (defun my-vendor-execute-git-update (repo-url repo-dir)
   "Execute git operation for REPO-URL into REPO-DIR."
   (let ((success nil))
@@ -382,6 +403,8 @@
       (error 
        (message "  ✗ Git operation failed for %s: %s" repo-url (error-message-string err))
        nil))))
+
+;; ------------------------------ Raw-tree HTTP path ------------------------------
 
 (defun my-vendor-extract-owner-repo (repo-url)
   "Extract 'owner/repo' from REPO-URL."
@@ -529,8 +552,153 @@
                  owner-repo (if local-sha (substring local-sha 0 7) "none"))
         t))))
 
+;; ------------------------------ Tarball HTTP path (pure Emacs) ------------------------------
+
+(defun my-vendor--trim-nul (s)
+  (if (string-match "\0" s) (substring s 0 (match-beginning 0)) s))
+
+(defun my-vendor--parse-octal (s)
+  (let* ((t0 (replace-regexp-in-string "[\0 ].*$" "" s)))
+    (if (string-empty-p t0) 0 (string-to-number t0 8))))
+
+(defun my-vendor--download-to-file (url file)
+  "Download URL to FILE using url-retrieve-synchronously, return t on success."
+  (let ((url-request-extra-headers
+         (append '(("User-Agent" . "Emacs my-vendor"))
+                 url-request-extra-headers)))
+    (condition-case err
+        (let ((buf (let ((url-request-timeout my/vendor-url-timeout))
+                     (url-retrieve-synchronously url t t))))
+          (when buf
+            (unwind-protect
+                (with-current-buffer buf
+                  (goto-char (point-min))
+                  (if (re-search-forward "^\r?\n\r?\n" nil t)
+                      (let ((body-start (point)))
+                        (write-region body-start (point-max) file nil 'silent)
+                        t)
+                    nil))
+              (kill-buffer buf))))
+      (error
+       (message "  ✗ download failed: %s" (error-message-string err))
+       nil))))
+
+(defun my-vendor--tar-peek-topdir (tarfile)
+  "Return top-level dir inside TARFILE (string without trailing slash), or nil.
+Supports .tar and .tar.gz via auto-compression-mode."
+  (with-temp-buffer
+    (setq buffer-file-coding-system 'no-conversion)
+    (set-buffer-multibyte nil)
+    (let ((coding-system-for-read 'no-conversion))
+      (insert-file-contents tarfile))
+    (let ((pos (point-min))
+          (end (point-max)))
+      (when (<= (+ pos 512) end)
+        (let ((block (buffer-substring-no-properties pos (+ pos 512))))
+          (unless (string-match-p "\\`\\(\0\\{512\\}\\)\\'" block)
+            (let* ((name (my-vendor--trim-nul (substring block 0 100)))
+                   (prefix (my-vendor--trim-nul (substring block 345 500)))
+                   (full (if (string-empty-p prefix) name (concat prefix "/" name))))
+              (car (split-string full "/" t)))))))))
+
+(defun my-vendor--tar-extract (tarfile dest &optional strip-components only-under)
+  "Extract TARFILE into DEST.
+STRIP-COMPONENTS removes first N path components (like tar --strip-components).
+If ONLY-UNDER is non-nil, only extract entries whose path starts with ONLY-UNDER/."
+  (setq dest (file-name-as-directory dest))
+  (make-directory dest t)
+  (with-temp-buffer
+    (setq buffer-file-coding-system 'no-conversion)
+    (set-buffer-multibyte nil)
+    (let ((coding-system-for-read 'no-conversion))
+      (insert-file-contents tarfile))
+    (let ((pos (point-min))
+          (end (point-max)))
+      (cl-labels
+          ((blk (o l) (buffer-substring-no-properties o (+ o l)))
+           (nul-p (s) (string-match-p "\\`\\(\0+\\)\\'" s))
+           (field (b off len) (my-vendor--trim-nul (substring b off (+ off len))))
+           (oct (b off len) (my-vendor--parse-octal (substring b off (+ off len)))))
+        (while (<= (+ pos 512) end)
+          (let ((block (blk pos 512)))
+            (if (nul-p block)
+                (setq pos (+ pos 512)) ; end padding; continue in case double zero block
+              (let* ((name   (field block 0 100))
+                     (size   (oct   block 124 12))
+                     (type   (let ((c (aref block 156))) (if (= c 0) ?0 c)))
+                     (prefix (field block 345 155))
+                     (full   (if (string-empty-p prefix) name (concat prefix "/" name))))
+                ;; Filter by ONLY-UNDER prefix (if provided)
+                (when (and only-under (not (string-prefix-p (concat only-under "/") full)))
+                  (setq full nil))
+                ;; Strip components and write
+                (when full
+                  (let* ((parts (split-string full "/" t))
+                         (parts* (nthcdr (or strip-components 0) parts))
+                         (rel (mapconcat #'identity parts* "/")))
+                    (when (not (string-empty-p rel))
+                      (let ((out (expand-file-name rel dest)))
+                        (pcase type
+                          (?5 (make-directory (file-name-as-directory out) t))
+                          ((or ?0 ?48) ; regular file
+                           (let* ((start (+ pos 512))
+                                  (endd  (+ start size)))
+                             (make-directory (file-name-directory out) t)
+                             (write-region start endd out nil 'silent)))
+                          (_ nil))))))
+                ;; advance to next header (size padded to 512)
+                (let* ((data-size size)
+                       (pad (mod (- 512 (mod data-size 512)) 512)))
+                  (setq pos (+ pos 512 data-size pad)))))))))))
+
+(defun my-vendor--sha-from-topdir (topdir)
+  "Try to extract commitish from TOPDIR like repo-<sha>."
+  (when (and topdir (string-match "-\\([0-9a-f]\\{7,40\\}\\)\\'" topdir))
+    (match-string 1 topdir)))
+
+(defun my-vendor-execute-archive-download (repo-url repo-dir)
+  "Download GitHub archive tarball (main/master) and extract into REPO-DIR.
+Store identified commit/hash in last-sha.txt. Return non-nil on success."
+  (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
+         (branches '("main" "master"))
+         (ok nil))
+    (dolist (br branches)
+      (unless ok
+        (let* ((tar-url (format "https://codeload.github.com/%s/tar.gz/refs/heads/%s"
+                                owner-repo br))
+               (tmp (make-temp-file "vendor-" nil ".tar.gz")))
+          (message "Downloading tarball (%s)..." br)
+          (when (my-vendor--download-to-file tar-url tmp)
+            (let* ((top (my-vendor--tar-peek-topdir tmp))
+                   (sha (or (my-vendor--sha-from-topdir top)
+                            (secure-hash 'sha256 (with-temp-buffer
+                                                   (let ((coding-system-for-read 'no-conversion))
+                                                     (insert-file-contents tmp))
+                                                   (buffer-string)))))
+                   (prev (my-vendor-get-local-sha repo-dir)))
+              (if (and prev sha (string= prev sha)
+                       (my-vendor-repo-present-p repo-dir))
+                  (progn
+                    (message "  ✓ Up to date (%s)" (substring sha 0 7))
+                    (setq ok t))
+                ;; Replace content
+                (when (file-directory-p repo-dir)
+                  (delete-directory repo-dir t t))
+                (make-directory repo-dir t)
+                (message "Extracting to %s..." repo-dir)
+                (my-vendor--tar-extract tmp repo-dir 1 top)
+                (when sha (my-vendor-update-local-sha repo-dir sha))
+                (message "  ✓ Installed %s (%s)"
+                         (file-name-nondirectory repo-dir)
+                         (substring sha 0 7))
+                (setq ok t)))
+            (ignore-errors (delete-file tmp))))))
+    ok))
+
+;; ------------------------------ Orchestration ------------------------------
+
 (defun my-vendor-autonomous-setup ()
-  "Enhanced autonomous vendor package setup with smart compilation."
+  "Enhanced autonomous vendor package setup with gitless Android fallback and smart compilation."
   (let* ((config my-vendor-autonomous-config)
          (strategy (my-vendor-select-strategy))
          (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory))
@@ -562,8 +730,18 @@
                 (repo-missing (not (my-vendor-repo-present-p repo-dir)))
                 (need-update (or repo-missing should-update)))
            (when need-update
-             (let ((ok (and (eq strategy 'git-update)
-                            (my-vendor-execute-git-update url repo-dir))))
+             (let ((ok nil))
+               (pcase strategy
+                 ('git-update
+                  (setq ok (my-vendor-execute-git-update url repo-dir)))
+                 ('download-archive
+                  (setq ok (my-vendor-execute-archive-download url repo-dir)))
+                 ('download-raw
+                  (setq ok (my-vendor-execute-raw-download url repo-dir)))
+                 (_ (setq ok nil)))
+               ;; Fallbacks: prefer archive, then raw
+               (unless ok
+                 (setq ok (my-vendor-execute-archive-download url repo-dir)))
                (unless ok
                  (setq ok (my-vendor-execute-raw-download url repo-dir)))
                (when ok (setq updated-any t))))))))
@@ -586,8 +764,10 @@
 ;; Execute setup
 (my-vendor-autonomous-setup)
 
+;; ------------------------------ Commands ------------------------------
+
 (defun my-vendor-status ()
-  "Show detailed cross-platform status."
+  "Show detailed cross-platform vendor status."
   (interactive)
   (let* ((config my-vendor-autonomous-config)
          (fingerprint (my-vendor-get-system-fingerprint)))
