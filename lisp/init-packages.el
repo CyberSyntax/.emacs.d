@@ -20,7 +20,7 @@
 (setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
 
 ;; Keep network waits short so init won't block too long.
-(defvar my/url-request-timeout 8
+(defvar my/url-request-timeout 10
   "Seconds to wait on a single HTTP(S) request before timing out.")
 (setq url-request-timeout my/url-request-timeout)
 

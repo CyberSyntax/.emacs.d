@@ -1,4 +1,4 @@
-;;; lisp/init-vendor.el --- Enhanced vendor manager (offline-aware) -*- lexical-binding: t; -*-
+;;; lisp/init-vendor.el --- Enhanced vendor manager (missing-repo aware) -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -6,9 +6,18 @@
 (require 'url)
 (require 'url-parse)
 
+;; User agent and token for GitHub API (optional but helps avoid rate limits)
+(defvar my-vendor-user-agent
+  (format "Emacs/%s (%s) my-vendor" emacs-version system-type))
+(defvar my-vendor-gh-token
+  (or (getenv "GITHUB_TOKEN") (getenv "GH_TOKEN"))
+  "If non-nil, used for authenticated GitHub API requests to raise rate limits.")
+
 ;; Keep network waits short
-(defvar my/vendor-url-timeout 8
+(defvar my/vendor-url-timeout 10
   "Seconds to wait on each GitHub API/raw request.")
+
+(setq url-request-timeout my/vendor-url-timeout)
 
 (defvar my-vendor-autonomous-config
   '((cache-file . "vendor-cache.json")
@@ -36,6 +45,9 @@
 (defvar my-vendor-runtime-data nil
   "Runtime data discovered about the environment.")
 
+(defvar my-vendor-force-update nil
+  "When non-nil, bypass daily throttle and update now.")
+
 (defun my-vendor--json-parse-string (str)
   "Parse JSON STR, returning alist."
   (if (fboundp 'json-parse-string)
@@ -45,6 +57,20 @@
           (json-false nil)
           (json-null nil))
       (json-read-from-string str))))
+
+(defun my-vendor--github-headers ()
+  "Return headers alist for GitHub API requests."
+  (let ((headers `(("User-Agent" . ,my-vendor-user-agent)
+                   ("Accept" . "application/vnd.github+json"))))
+    (when (and my-vendor-gh-token (not (string-empty-p my-vendor-gh-token)))
+      (push (cons "Authorization" (format "Bearer %s" my-vendor-gh-token)) headers))
+    headers))
+
+(defun my-vendor--with-github-headers (fn)
+  "Call FN with GitHub headers temporarily set."
+  (let ((url-request-extra-headers
+         (append (my-vendor--github-headers) url-request-extra-headers)))
+    (funcall fn)))
 
 (defun my-vendor-get-system-fingerprint ()
   "Generate a cross-platform system fingerprint."
@@ -170,7 +196,8 @@
   "Smart compilation with dependency resolution."
   (let* ((cache-dir (my-vendor-get-compile-cache-dir repo-name))
          (config my-vendor-autonomous-config)
-         (auto-compile (cdr (assoc 'auto-compile config))))
+         (auto-compile (cdr (assoc 'auto-compile config)))
+         (warning-level (cdr (assoc 'compilation-warnings config))))
     (unless auto-compile
       (message "Auto-compilation disabled, using source files for %s" repo-name)
       (cl-return-from my-vendor-compile-package-smart source-dir))
@@ -206,7 +233,13 @@
                         (when (my-vendor-ensure-lexical-binding target-el)
                           (message "    Fixed lexical-binding in %s" relative-path))
                         (condition-case compile-err
-                            (let ((byte-compile-warnings '(obsolete))
+                            (let ((byte-compile-error-on-warn (eq warning-level 'strict))
+                                  (byte-compile-warnings 
+                                   (pcase warning-level
+                                     ('none nil)
+                                     ('moderate '(obsolete))
+                                     ('strict t)
+                                     (_ '(obsolete))))
                                   (byte-compile-log-buffer-name "*Vendor Compile Log*"))
                               (if (byte-compile-file target-el)
                                   (progn
@@ -276,37 +309,59 @@
           (fs-writable (cdr (assoc 'filesystem-writable env-data))))
       (cond
        ((and git-ok network-ok fs-writable) 'git-update)
-       ((and (eq system-type 'android) network-ok fs-writable) 'download-raw)
+       ((and network-ok fs-writable) 'download-raw)
        ((not fs-writable) 'readonly)
        (t 'fallback)))))
 
-(defun my-vendor-should-update-p ()
-  "Check if we should update today."
+(defun my-vendor-repo-present-p (repo-dir)
+  "Return non-nil if REPO-DIR appears to contain content."
+  (and (file-directory-p repo-dir)
+       (or (file-directory-p (expand-file-name ".git" repo-dir))
+           (file-exists-p (expand-file-name "last-sha.txt" repo-dir))
+           (let ((els (directory-files-recursively repo-dir "\\.el\\'")))
+             (and els (not (null els)))))))
+
+(defun my-vendor-missing-repos ()
+  "Return list of (URL . NAME) for repos not present locally."
   (let* ((config my-vendor-autonomous-config)
-         (cache-file (expand-file-name 
-                      (cdr (assoc 'cache-file config))
-                      temporary-file-directory))
-         (today (format-time-string "%Y-%m-%d")))
-    (if (file-exists-p cache-file)
-        (condition-case nil
-            (let ((last-update (with-temp-buffer
-                                 (insert-file-contents cache-file)
-                                 (string-trim (buffer-string)))))
-              (not (string= last-update today)))
-          (error t))
-      t)))
+         (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory))
+         (repos (cdr (assoc 'repositories config)))
+         (missing '()))
+    (dolist (repo repos)
+      (let* ((name (cdr repo))
+             (dir (expand-file-name name vendor-dir)))
+        (unless (my-vendor-repo-present-p dir)
+          (push repo missing))))
+    (nreverse missing)))
+
+(defun my-vendor-should-update-p ()
+  "Check if we should update today. Always true if repos missing or forced."
+  (let* ((config my-vendor-autonomous-config)
+         (cache-file (expand-file-name (cdr (assoc 'cache-file config))
+                                       temporary-file-directory))
+         (today (format-time-string "%Y-%m-%d"))
+         (missing (my-vendor-missing-repos)))
+    (or my-vendor-force-update
+        missing
+        (if (file-exists-p cache-file)
+            (condition-case nil
+                (let ((last-update (with-temp-buffer
+                                     (insert-file-contents cache-file)
+                                     (string-trim (buffer-string)))))
+                  (not (string= last-update today)))
+              (error t))
+          t))))
 
 (defun my-vendor-mark-updated ()
   "Mark that we updated today."
   (let* ((config my-vendor-autonomous-config)
-         (cache-file (expand-file-name 
-                      (cdr (assoc 'cache-file config))
-                      temporary-file-directory))
+         (cache-file (expand-file-name (cdr (assoc 'cache-file config))
+                                       temporary-file-directory))
          (today (format-time-string "%Y-%m-%d")))
-  (condition-case nil
-      (with-temp-file cache-file
-        (insert today))
-    (error nil))))
+    (condition-case nil
+        (with-temp-file cache-file
+          (insert today))
+      (error nil))))
 
 (defun my-vendor-execute-git-update (repo-url repo-dir)
   "Execute git operation for REPO-URL into REPO-DIR."
@@ -335,22 +390,42 @@
         (match-string 1 clean-url)
       (error "Invalid GitHub URL: %s" repo-url))))
 
-(defun my-vendor-fetch-latest-commit-sha (owner-repo)
-  "Fetch the latest commit SHA for OWNER-REPO's main branch from GitHub API."
-  (let* ((api-url (format "https://api.github.com/repos/%s/commits/main" owner-repo))
-         (buf (let ((url-request-timeout my/vendor-url-timeout))
-                (url-retrieve-synchronously api-url t t)))
-         (json nil))
-    (when buf
-      (with-current-buffer buf
-        (goto-char (point-min))
-        (when (re-search-forward "^\r?\n\r?\n" nil t)
-          (setq json (my-vendor--json-parse-string
-                      (buffer-substring-no-properties (point) (point-max))))))
-      (kill-buffer buf))
-    (if json
-        (alist-get 'sha json)
-      (error "Failed to fetch commit SHA for %s (rate limit or network issue?)" owner-repo))))
+(defun my-vendor-fetch-default-branch (owner-repo)
+  "Get the repository default branch via GitHub API (fallback to main/master)."
+  (my-vendor--with-github-headers
+   (lambda ()
+     (let* ((api-url (format "https://api.github.com/repos/%s" owner-repo))
+            (buf (let ((url-request-timeout my/vendor-url-timeout))
+                   (url-retrieve-synchronously api-url t t)))
+            (branch nil))
+       (when buf
+         (with-current-buffer buf
+           (goto-char (point-min))
+           (when (re-search-forward "^\r?\n\r?\n" nil t)
+             (let* ((json (my-vendor--json-parse-string
+                           (buffer-substring-no-properties (point) (point-max)))))
+               (setq branch (or (alist-get 'default_branch json) branch)))))
+         (kill-buffer buf))
+       (or branch "main")))))
+
+(defun my-vendor-fetch-latest-commit-sha (owner-repo branch)
+  "Fetch the latest commit SHA for OWNER-REPO's BRANCH via GitHub API."
+  (my-vendor--with-github-headers
+   (lambda ()
+     (let* ((api-url (format "https://api.github.com/repos/%s/commits/%s" owner-repo branch))
+            (buf (let ((url-request-timeout my/vendor-url-timeout))
+                   (url-retrieve-synchronously api-url t t)))
+            (json nil))
+       (when buf
+         (with-current-buffer buf
+           (goto-char (point-min))
+           (when (re-search-forward "^\r?\n\r?\n" nil t)
+             (setq json (my-vendor--json-parse-string
+                         (buffer-substring-no-properties (point) (point-max))))))
+         (kill-buffer buf))
+       (if json
+           (alist-get 'sha json)
+         (error "Failed to fetch commit SHA for %s (%s)" owner-repo branch))))))
 
 (defun my-vendor-get-local-sha (repo-dir)
   "Get the stored local SHA from REPO-DIR's last-sha.txt, or nil if missing."
@@ -366,28 +441,33 @@
     (with-temp-file sha-file
       (insert new-sha))))
 
-(defun my-vendor-fetch-github-tree (owner-repo)
-  "Fetch recursive file tree from GitHub API for OWNER-REPO's main branch."
-  (let* ((api-url (format "https://api.github.com/repos/%s/git/trees/main?recursive=1" owner-repo))
-         (buf (let ((url-request-timeout my/vendor-url-timeout))
-                (url-retrieve-synchronously api-url t t)))
-         (json nil))
-    (when buf
-      (with-current-buffer buf
-        (goto-char (point-min))
-        (when (re-search-forward "^\r?\n\r?\n" nil t)
-          (setq json (my-vendor--json-parse-string
-                      (buffer-substring-no-properties (point) (point-max))))))
-      (kill-buffer buf))
-    (if (and json (alist-get 'tree json))
-        (alist-get 'tree json)
-      (error "Failed to fetch tree for %s (rate limit?)" owner-repo))))
+(defun my-vendor-fetch-github-tree (owner-repo branch)
+  "Fetch recursive file tree from GitHub API for OWNER-REPO's BRANCH."
+  (my-vendor--with-github-headers
+   (lambda ()
+     (let* ((api-url (format "https://api.github.com/repos/%s/git/trees/%s?recursive=1"
+                             owner-repo branch))
+            (buf (let ((url-request-timeout my/vendor-url-timeout))
+                   (url-retrieve-synchronously api-url t t)))
+            (json nil))
+       (when buf
+         (with-current-buffer buf
+           (goto-char (point-min))
+           (when (re-search-forward "^\r?\n\r?\n" nil t)
+             (setq json (my-vendor--json-parse-string
+                         (buffer-substring-no-properties (point) (point-max))))))
+         (kill-buffer buf))
+       (if (and json (alist-get 'tree json))
+           (alist-get 'tree json)
+         (error "Failed to fetch tree for %s (%s)" owner-repo branch))))))
 
-(defun my-vendor-download-raw-file (owner-repo path local-file)
-  "Download raw file content from GitHub for OWNER-REPO's PATH to LOCAL-FILE."
-  (let ((raw-url (format "https://raw.githubusercontent.com/%s/main/%s" owner-repo path)))
+(defun my-vendor-download-raw-file (owner-repo branch path local-file)
+  "Download raw file from GitHub OWNER-REPO BRANCH PATH to LOCAL-FILE."
+  (let ((raw-url (format "https://raw.githubusercontent.com/%s/%s/%s" owner-repo branch path)))
     (with-temp-buffer
-      (let ((url-request-timeout my/vendor-url-timeout))
+      (let ((url-request-timeout my/vendor-url-timeout)
+            (url-request-extra-headers
+             (append '(("User-Agent" . "curl/7.79.1")) url-request-extra-headers)))
         (condition-case err
             (progn
               (url-insert-file-contents raw-url)
@@ -398,13 +478,18 @@
            nil))))))
 
 (defun my-vendor-execute-raw-download (repo-url repo-dir)
-  "Download raw files for REPO-URL into REPO-DIR if validation shows an update is needed."
+  "Download raw files for REPO-URL into REPO-DIR (full repo snapshot)."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
+         (branch (condition-case _
+                     (my-vendor-fetch-default-branch owner-repo)
+                   (error "main")))
          (local-sha (my-vendor-get-local-sha repo-dir))
          (remote-sha (condition-case err
-                         (my-vendor-fetch-latest-commit-sha owner-repo)
+                         (or (my-vendor-fetch-latest-commit-sha owner-repo branch)
+                             (my-vendor-fetch-latest-commit-sha owner-repo "master"))
                        (error
-                        (message "  ✗ SHA fetch failed for %s: %s - Skipping update" owner-repo (error-message-string err))
+                        (message "  ✗ SHA fetch failed for %s: %s - Skipping update"
+                                 owner-repo (error-message-string err))
                         nil))))
     (if (and remote-sha
              (or (null local-sha) (not (string= local-sha remote-sha))))
@@ -413,8 +498,10 @@
               (when (file-directory-p repo-dir)
                 (delete-directory repo-dir t t)
                 (message "  Deleted old repo: %s" repo-dir))
-              (message "Fetching file tree for %s..." owner-repo)
-              (let ((tree (my-vendor-fetch-github-tree owner-repo))
+              (message "Fetching file tree for %s (%s)..." owner-repo branch)
+              (let ((tree (condition-case _
+                             (my-vendor-fetch-github-tree owner-repo branch)
+                           (error (my-vendor-fetch-github-tree owner-repo "master"))))
                     (file-count 0))
                 (dolist (item tree)
                   (let ((path (alist-get 'path item))
@@ -424,12 +511,13 @@
                       (make-directory (expand-file-name path repo-dir) t))
                      ((string= type "blob")
                       (let ((local-file (expand-file-name path repo-dir)))
-                        (when (my-vendor-download-raw-file owner-repo path local-file)
+                        (when (my-vendor-download-raw-file owner-repo branch path local-file)
                           (setq file-count (1+ file-count))))))))
                 (if (> file-count 0)
                     (progn
                       (my-vendor-update-local-sha repo-dir remote-sha)
-                      (message "  ✓ Downloaded %d files to %s (updated to SHA %s)" file-count repo-dir (substring remote-sha 0 7))
+                      (message "  ✓ Downloaded %d files to %s (SHA %s)"
+                               file-count repo-dir (substring remote-sha 0 7))
                       t)
                   (message "  ✗ No files downloaded for %s" owner-repo)
                   nil)))
@@ -437,62 +525,50 @@
            (message "  ✗ Raw download failed for %s: %s" owner-repo (error-message-string err))
            nil))
       (progn
-        (message "  ✓ Skipping download for %s—already up to date (SHA %s)" owner-repo (if local-sha (substring local-sha 0 7) "none"))
+        (message "  ✓ Skipping download for %s—already up to date (SHA %s)"
+                 owner-repo (if local-sha (substring local-sha 0 7) "none"))
         t))))
 
 (defun my-vendor-autonomous-setup ()
   "Enhanced autonomous vendor package setup with smart compilation."
   (let* ((config my-vendor-autonomous-config)
          (strategy (my-vendor-select-strategy))
-         (vendor-dir (expand-file-name 
-                      (cdr (assoc 'vendor-subdir config))
-                      user-emacs-directory))
+         (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory))
          (repositories (cdr (assoc 'repositories config)))
+         (missing (my-vendor-missing-repos))
          (should-update (my-vendor-should-update-p))
          (updated-any nil)
          (fingerprint (my-vendor-get-system-fingerprint)))
-    
     (message "=== Enhanced Cross-Platform Vendor Setup ===")
     (message "Platform fingerprint: %s" fingerprint)
     (message "Vendor directory: %s" vendor-dir)
     (message "Strategy: %s" strategy)
-    (message "Should update: %s" (if should-update "YES" "NO"))
-    
+    (message "Should update: %s%s"
+             (if should-update "YES" "NO")
+             (if missing " (missing repos present)" ""))
+    ;; Ensure vendor directory exists
     (condition-case nil
         (unless (file-directory-p vendor-dir)
           (make-directory vendor-dir t))
-      (error 
-       (setq strategy 'readonly)))
-    
+      (error (setq strategy 'readonly)))
+    ;; Update logic: always update missing repos; honor throttle for existing ones
     (pcase strategy
-      ('git-update
-       (if should-update
-           (progn
-             (dolist (repo repositories)
-               (let* ((url (car repo))
-                      (name (cdr repo))
-                      (repo-dir (expand-file-name name vendor-dir)))
-                 (if (my-vendor-execute-git-update url repo-dir)
-                     (setq updated-any t)
-                   ;; Per-repo fallback: try raw download if git failed
-                   (when (my-vendor-execute-raw-download url repo-dir)
-                     (setq updated-any t)))))
-             (when updated-any (my-vendor-mark-updated)))
-         (message "Skipping update - already done today")))
-      ('download-raw
-       (if should-update
-           (progn
-             (dolist (repo repositories)
-               (let* ((url (car repo))
-                      (name (cdr repo))
-                      (repo-dir (expand-file-name name vendor-dir)))
-                 (when (my-vendor-execute-raw-download url repo-dir)
-                   (setq updated-any t))))
-             (when updated-any (my-vendor-mark-updated)))
-         (message "Skipping update - already done today")))
       ('readonly (message "Read-only mode"))
-      (_ (message "Fallback mode")))
-    
+      (_
+       (dolist (repo repositories)
+         (let* ((url (car repo))
+                (name (cdr repo))
+                (repo-dir (expand-file-name name vendor-dir))
+                (repo-missing (not (my-vendor-repo-present-p repo-dir)))
+                (need-update (or repo-missing should-update)))
+           (when need-update
+             (let ((ok (and (eq strategy 'git-update)
+                            (my-vendor-execute-git-update url repo-dir))))
+               (unless ok
+                 (setq ok (my-vendor-execute-raw-download url repo-dir)))
+               (when ok (setq updated-any t))))))))
+    (when updated-any (my-vendor-mark-updated))
+    ;; Smart compile and add to load-path
     (let ((added-paths 0))
       (message "Smart compilation and load-path setup:")
       (dolist (repo repositories)
@@ -521,7 +597,13 @@
     (message "Dependency handling: %s" (if (cdr (assoc 'handle-dependencies config)) "ON" "OFF"))
     (message "Warning level: %s" (cdr (assoc 'compilation-warnings config)))
     (my-vendor-discover-environment)
-    (message "Capabilities: %S" my-vendor-runtime-data)))
+    (message "Capabilities: %S" my-vendor-runtime-data))
+  (let* ((config my-vendor-autonomous-config)
+         (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory)))
+    (dolist (repo (cdr (assoc 'repositories config)))
+      (let ((name (cdr repo))
+            (dir (expand-file-name (cdr repo) vendor-dir)))
+        (message "%-28s %s" name (if (my-vendor-repo-present-p dir) "OK" "MISSING"))))))
 
 (defun my-vendor-toggle-compilation ()
   "Toggle auto-compilation on/off."
@@ -540,15 +622,27 @@
   "Clean compilation cache."
   (interactive)
   (let* ((config my-vendor-autonomous-config)
-         (vendor-dir (expand-file-name 
-                      (cdr (assoc 'vendor-subdir config))
-                      user-emacs-directory))
-         (cache-base-dir (expand-file-name 
-                          (cdr (assoc 'compile-cache-subdir config))
-                          vendor-dir)))
+         (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory))
+         (cache-base-dir (expand-file-name (cdr (assoc 'compile-cache-subdir config)) vendor-dir)))
     (when (file-directory-p cache-base-dir)
       (delete-directory cache-base-dir t)
       (message "Cache cleaned: %s" cache-base-dir))))
+
+(defun my-vendor-reset-daily-throttle ()
+  "Delete the daily throttle marker so next run will update."
+  (interactive)
+  (let* ((config my-vendor-autonomous-config)
+         (cache-file (expand-file-name (cdr (assoc 'cache-file config))
+                                       temporary-file-directory)))
+    (when (file-exists-p cache-file)
+      (delete-file cache-file)
+      (message "Removed throttle file: %s" cache-file))))
+
+(defun my-vendor-update-now ()
+  "Force update vendors now (ignore daily throttle)."
+  (interactive)
+  (let ((my-vendor-force-update t))
+    (my-vendor-autonomous-setup)))
 
 (provide 'init-vendor)
 
