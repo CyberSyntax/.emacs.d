@@ -8,8 +8,7 @@
 ;; - Optionally byte-compiles into a per-platform cache for faster loads.
 ;;
 ;; Notes:
-;; - We correctly detect Android using (eq system-type 'android).
-;; - If you previously used (string= system-type "android") in other files, change it to (eq system-type 'android).
+;; - Detect Android using (eq system-type 'android).
 ;; - No reliance on /data/data/com.termux/...; native Android Emacs generally cannot access Termux paths.
 
 (require 'cl-lib)
@@ -22,14 +21,14 @@
 (unless (bound-and-true-p auto-compression-mode)
   (auto-compression-mode 1))
 
-;; User agent and optional token for GitHub API (helps raise rate limits)
+;; User agent and optional token for GitHub API (helps raise rate limits).
 (defvar my-vendor-user-agent
   (format "Emacs/%s (%s) my-vendor" emacs-version system-type))
 (defvar my-vendor-gh-token
   (or (getenv "GITHUB_TOKEN") (getenv "GH_TOKEN"))
   "If non-nil, used for authenticated GitHub API requests to raise rate limits.")
 
-;; Keep network waits short
+;; Keep network waits reasonable
 (defvar my/vendor-url-timeout 120
   "Seconds to wait on each GitHub API/raw request.")
 (setq url-request-timeout my/vendor-url-timeout)
@@ -62,7 +61,7 @@
 (defvar my-vendor-force-update nil
   "When non-nil, bypass daily throttle and update now.")
 
-;; Per-repo branch map (owner/repo -> preferred branch)
+;; Per-repo preferred branches (owner/repo -> branch).
 (defvar my-vendor-branch-overrides
   '(("bohonghuang/org-srs" . "master")
     ("open-spaced-repetition/lisp-fsrs" . "master")
@@ -76,9 +75,8 @@
 (defun my-vendor--candidate-branches (owner-repo)
   "Return a deduplicated list of branches to try for OWNER-REPO."
   (let* ((override (alist-get owner-repo my-vendor-branch-overrides nil nil #'string=))
-         (def-branch (condition-case nil
-                         (my-vendor-fetch-default-branch owner-repo)
-                       (error nil))))
+         (def-branch (ignore-errors
+                       (my-vendor-fetch-default-branch owner-repo))))
     (delete-dups (delq nil (list override def-branch "main" "master")))))
 
 ;; ------------------------------ Utilities ------------------------------
@@ -92,20 +90,6 @@
           (json-false nil)
           (json-null nil))
       (json-read-from-string str))))
-
-(defun my-vendor--github-headers ()
-  "Return headers alist for GitHub API requests."
-  (let ((headers `(("User-Agent" . ,my-vendor-user-agent)
-                   ("Accept" . "application/vnd.github+json"))))
-    (when (and my-vendor-gh-token (not (string-empty-p my-vendor-gh-token)))
-      (push (cons "Authorization" (format "Bearer %s" my-vendor-gh-token)) headers))
-    headers))
-
-(defun my-vendor--with-github-headers (fn)
-  "Call FN with GitHub headers temporarily set."
-  (let ((url-request-extra-headers
-         (append (my-vendor--github-headers) url-request-extra-headers)))
-    (funcall fn)))
 
 (defun my-vendor-get-system-fingerprint ()
   "Generate a cross-platform system fingerprint."
@@ -423,6 +407,42 @@
        (message "  ✗ Git operation failed for %s: %s" repo-url (error-message-string err))
        nil))))
 
+;; ------------------------------ HTTP helpers (API JSON with fallback) ------------------------------
+
+(defun my-vendor--http-get-json (url with-auth)
+  "Return (CODE . JSON-ALIST) for URL. WITH-AUTH adds Authorization if token set."
+  (let* ((url-request-extra-headers
+          (append
+           `(("User-Agent" . ,my-vendor-user-agent)
+             ("Accept" . "application/vnd.github+json"))
+           (when (and with-auth my-vendor-gh-token (not (string-empty-p my-vendor-gh-token)))
+             (list (cons "Authorization" (format "Bearer %s" my-vendor-gh-token))))
+           url-request-extra-headers))
+         (url-request-timeout my/vendor-url-timeout)
+         (buf (url-retrieve-synchronously url t t))
+         (result nil))
+    (when buf
+      (unwind-protect
+          (with-current-buffer buf
+            (goto-char (point-min))
+            (let ((code (when (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t)
+                          (string-to-number (match-string 1)))))
+              (when (re-search-forward "^\r?\n\r?\n" nil t)
+                (setq result
+                      (cons code
+                            (ignore-errors
+                              (my-vendor--json-parse-string
+                               (buffer-substring-no-properties (point) (point-max)))))))))
+        (kill-buffer buf)))
+    result))
+
+(defun my-vendor--github-api-get-json (url)
+  "Fetch GitHub API JSON from URL. Try with auth then without on 401/403."
+  (let ((resp (my-vendor--http-get-json url t)))
+    (when (and resp (memq (car resp) '(401 403)))
+      (setq resp (my-vendor--http-get-json url nil)))
+    resp))
+
 ;; ------------------------------ Raw-tree HTTP path ------------------------------
 
 (defun my-vendor-extract-owner-repo (repo-url)
@@ -434,41 +454,20 @@
     (replace-regexp-in-string "/\\'" "" m)))
 
 (defun my-vendor-fetch-default-branch (owner-repo)
-  "Get the repository default branch via GitHub API (fallback to main/master)."
-  (my-vendor--with-github-headers
-   (lambda ()
-     (let* ((api-url (format "https://api.github.com/repos/%s" owner-repo))
-            (buf (let ((url-request-timeout my/vendor-url-timeout))
-                   (url-retrieve-synchronously api-url t t)))
-            (branch nil))
-       (when buf
-         (with-current-buffer buf
-           (goto-char (point-min))
-           (when (re-search-forward "^\r?\n\r?\n" nil t)
-             (let* ((json (my-vendor--json-parse-string
-                           (buffer-substring-no-properties (point) (point-max)))))
-               (setq branch (or (alist-get 'default_branch json) branch)))))
-         (kill-buffer buf))
-       (or branch "main")))))
+  "Get the repository default branch via GitHub API (fallback to main)."
+  (let* ((api-url (format "https://api.github.com/repos/%s" owner-repo))
+         (resp (my-vendor--github-api-get-json api-url))
+         (code (car-safe resp))
+         (json (cdr-safe resp))
+         (branch (and json (alist-get 'default_branch json))))
+    (or branch "main")))
 
 (defun my-vendor-fetch-latest-commit-sha (owner-repo branch)
   "Fetch the latest commit SHA for OWNER-REPO's BRANCH via GitHub API."
-  (my-vendor--with-github-headers
-   (lambda ()
-     (let* ((api-url (format "https://api.github.com/repos/%s/commits/%s" owner-repo branch))
-            (buf (let ((url-request-timeout my/vendor-url-timeout))
-                   (url-retrieve-synchronously api-url t t)))
-            (json nil))
-       (when buf
-         (with-current-buffer buf
-           (goto-char (point-min))
-           (when (re-search-forward "^\r?\n\r?\n" nil t)
-             (setq json (my-vendor--json-parse-string
-                         (buffer-substring-no-properties (point) (point-max))))))
-         (kill-buffer buf))
-       (if json
-           (alist-get 'sha json)
-         (error "Failed to fetch commit SHA for %s (%s)" owner-repo branch))))))
+  (let* ((api-url (format "https://api.github.com/repos/%s/commits/%s" owner-repo branch))
+         (resp (my-vendor--github-api-get-json api-url))
+         (json (cdr-safe resp)))
+    (and json (alist-get 'sha json))))
 
 (defun my-vendor-get-local-sha (repo-dir)
   "Get the stored local SHA from REPO-DIR's last-sha.txt, or nil if missing."
@@ -485,38 +484,20 @@
       (insert new-sha))))
 
 (defun my-vendor-fetch-github-tree (owner-repo branch)
-  "Fetch recursive file tree from GitHub API for OWNER-REPO's BRANCH."
-  (my-vendor--with-github-headers
-   (lambda ()
-     (let* ((api-url (format "https://api.github.com/repos/%s/git/trees/%s?recursive=1"
-                             owner-repo branch))
-            (buf (let ((url-request-timeout my/vendor-url-timeout))
-                   (url-retrieve-synchronously api-url t t)))
-            (json nil))
-       (when buf
-         (with-current-buffer buf
-           (goto-char (point-min))
-           (when (re-search-forward "^\r?\n\r?\n" nil t)
-             (setq json (my-vendor--json-parse-string
-                         (buffer-substring-no-properties (point) (point-max))))))
-         (kill-buffer buf))
-       (if (and json (alist-get 'tree json))
-           (alist-get 'tree json)
-         (error "Failed to fetch tree for %s (%s)" owner-repo branch))))))
+  "Fetch recursive file tree from GitHub API for OWNER-REPO's BRANCH.
+Returns list of tree entries or nil."
+  (let* ((api-url (format "https://api.github.com/repos/%s/git/trees/%s?recursive=1"
+                          owner-repo branch))
+         (resp (my-vendor--github-api-get-json api-url))
+         (json (cdr-safe resp)))
+    (and json (alist-get 'tree json))))
 
 (defun my-vendor-download-raw-file (owner-repo branch path local-file)
-  "Download raw file from GitHub OWNER-REPO BRANCH PATH to LOCAL-FILE."
+  "Download raw file from GitHub OWNER-REPO BRANCH PATH to LOCAL-FILE (no auth)."
   (let ((raw-url (format "https://raw.githubusercontent.com/%s/%s/%s" owner-repo branch path)))
     (with-temp-buffer
-      (let* ((uobj (ignore-errors (url-generic-parse-url raw-url)))
-             (host (downcase (or (and uobj (url-host uobj)) "")))
-             (auth-h (when (and my-vendor-gh-token (not (string-empty-p my-vendor-gh-token)))
-                       (cons "Authorization" (format "Bearer %s" my-vendor-gh-token))))
-             (url-request-extra-headers
-              (append
-               '(("User-Agent" . "Emacs my-vendor"))
-               (when auth-h (list auth-h))
-               url-request-extra-headers)))
+      (let ((url-request-extra-headers '(("User-Agent" . "Emacs my-vendor")))
+            (url-request-timeout my/vendor-url-timeout))
         (condition-case err
             (progn
               (url-insert-file-contents raw-url)
@@ -527,7 +508,7 @@
            nil))))))
 
 (defun my-vendor-execute-raw-download (repo-url repo-dir)
-  "Download raw files for REPO-URL into REPO-DIR (full repo snapshot)."
+  "Download raw files for REPO-URL into REPO-DIR (API tree + raw blobs)."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
          (branches (my-vendor--candidate-branches owner-repo))
          (local-sha (my-vendor-get-local-sha repo-dir))
@@ -540,21 +521,17 @@
                            (my-vendor-fetch-latest-commit-sha owner-repo br)))
         (when remote-sha (setq branch br))))
     (cond
-     ;; No SHA and no local copy -> fail (so caller can report missing).
      ((and (null remote-sha) (not (my-vendor-repo-present-p repo-dir)))
       (message "  ✗ Skipping download for %s—no SHA and no local copy" owner-repo)
       nil)
-     ;; No SHA but local copy exists -> treat as success (no change).
      ((null remote-sha)
       (message "  ✓ Skipping download for %s—couldn’t determine remote SHA; leaving existing copy"
                owner-repo)
       t)
-     ;; SHA unchanged -> no work needed.
      ((and local-sha (string= local-sha remote-sha))
       (message "  ✓ Skipping download for %s—already up to date (SHA %s)"
                owner-repo (substring remote-sha 0 7))
       t)
-     ;; Download full tree and write files.
      (t
       (condition-case err
           (progn
@@ -562,7 +539,9 @@
               (delete-directory repo-dir t t)
               (message "  Deleted old repo: %s" repo-dir))
             (message "Fetching file tree for %s (%s)..." owner-repo branch)
-            (let ((tree (my-vendor-fetch-github-tree owner-repo branch))
+            (let ((tree (or (ignore-errors (my-vendor-fetch-github-tree owner-repo branch))
+                            (ignore-errors (my-vendor-fetch-github-tree owner-repo "master"))
+                            (ignore-errors (my-vendor-fetch-github-tree owner-repo "main"))))
                   (file-count 0))
               (dolist (item tree)
                 (let ((path (alist-get 'path item))
@@ -596,22 +575,17 @@
     (if (string-empty-p t0) 0 (string-to-number t0 8))))
 
 (defun my-vendor--download-to-file (url file &optional redirects-left)
-  "Download URL to FILE; follow redirects; return t on success."
+  "Download URL to FILE; follow redirects; return t on success.
+Adds Authorization only for api.github.com (never for github.com/codeload/raw)."
   (let* ((redirects-left (or redirects-left 4))
          (uobj (ignore-errors (url-generic-parse-url url)))
          (host (downcase (or (and uobj (url-host uobj)) "")))
-         (is-gh-host (or (string-match-p "\\.github\\.com\\'" host)
-                         (string-match-p "\\`github\\.com\\'" host)
-                         (string-match-p "\\`api\\.github\\.com\\'" host)
-                         (string-match-p "\\`codeload\\.github\\.com\\'" host)
-                         (string-match-p "\\`raw\\.githubusercontent\\.com\\'" host)))
-         (auth-h (when (and is-gh-host my-vendor-gh-token
-                            (not (string-empty-p my-vendor-gh-token)))
-                   (cons "Authorization" (format "Bearer %s" my-vendor-gh-token))))
+         (is-api-host (string= host "api.github.com"))
          (url-request-extra-headers
           (append
            '(("User-Agent" . "Emacs my-vendor"))
-           (when auth-h (list auth-h))
+           (when (and is-api-host my-vendor-gh-token (not (string-empty-p my-vendor-gh-token)))
+             (list (cons "Authorization" (format "Bearer %s" my-vendor-gh-token))))
            url-request-extra-headers))
          (url-request-timeout my/vendor-url-timeout)
          (result nil))
@@ -706,7 +680,7 @@ If ONLY-UNDER is non-nil, only extract entries whose path starts with ONLY-UNDER
                       (let ((out (expand-file-name rel dest)))
                         (pcase type
                           (?5 (make-directory (file-name-as-directory out) t))
-                          ((or ?0 48) ; both are the character '0'
+                          ((or ?0 48)
                            (let* ((start (+ pos 512))
                                   (endd  (+ start size)))
                              (make-directory (file-name-directory out) t)
