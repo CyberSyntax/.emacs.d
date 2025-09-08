@@ -4,7 +4,7 @@
   :ensure t
   :init
   ;; Robust streaming + media support
-  (setq gptel-use-curl t
+  (setq gptel-use-curl (and (executable-find "curl") t)
         gptel-track-media t)
   ;; Include reasoning text (optional, leave default if your gptel is older)
   (when (boundp 'gptel-include-reasoning)

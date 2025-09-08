@@ -64,6 +64,11 @@
 
 (setq org-id-uuid-program (expand-file-name "bin/uuidgenlc" user-emacs-directory))
 
+;; Fallback on platforms (e.g. Android) if the program doesn’t exist
+(when (and (boundp 'org-id-uuid-program)
+           (not (file-exists-p org-id-uuid-program)))
+  (setq org-id-uuid-program nil))
+
 ;; This allows Org mode to store and retrieve unique identifiers
 ;; across all your Org files.
 (setq org-id-track-globally t)
