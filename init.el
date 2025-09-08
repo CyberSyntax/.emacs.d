@@ -50,12 +50,18 @@
 ;; Load Vendor Packages
 ;; ===================================================================
 
-(defmacro require-if-available (feature &optional filename)
-  `(let ((lib (or ,filename (symbol-name ',feature))))
-     (if (locate-library lib)
-         (require ',feature)
-       (message "Skipped require %s (not installed yet)" ',feature)
-       nil)))
+(defun require-if-available (feature &optional filename)
+  "Require FEATURE if its library is found, else just log and return nil.
+FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name to locate."
+  (let* ((feat (cond
+                ((symbolp feature) feature)
+                ((stringp feature) (intern feature))
+                (t (error "FEATURE must be symbol or string, got: %S" feature))))
+         (lib  (or filename (symbol-name feat))))
+    (if (locate-library lib)
+        (require feat nil t)
+      (message "Skipped require %s (not installed yet)" feat)
+      nil)))
 
 (require-if-available 'org-headline-manager)
 (require-if-available 'hanja-reading)
