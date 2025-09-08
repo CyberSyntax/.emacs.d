@@ -640,7 +640,7 @@ If ONLY-UNDER is non-nil, only extract entries whose path starts with ONLY-UNDER
                       (let ((out (expand-file-name rel dest)))
                         (pcase type
                           (?5 (make-directory (file-name-as-directory out) t))
-                          ((or ?0 ?48) ; regular file
+                          ((or ?0 48) ; both are the character '0'
                            (let* ((start (+ pos 512))
                                   (endd  (+ start size)))
                              (make-directory (file-name-directory out) t)
