@@ -489,9 +489,15 @@
   "Download raw file from GitHub OWNER-REPO BRANCH PATH to LOCAL-FILE."
   (let ((raw-url (format "https://raw.githubusercontent.com/%s/%s/%s" owner-repo branch path)))
     (with-temp-buffer
-      (let ((url-request-timeout my/vendor-url-timeout)
-            (url-request-extra-headers
-             (append '(("User-Agent" . "curl/7.79.1")) url-request-extra-headers)))
+      (let* ((uobj (ignore-errors (url-generic-parse-url raw-url)))
+             (host (downcase (or (and uobj (url-host uobj)) "")))
+             (auth-h (when (and my-vendor-gh-token (not (string-empty-p my-vendor-gh-token)))
+                       (cons "Authorization" (format "Bearer %s" my-vendor-gh-token))))
+             (url-request-extra-headers
+              (append
+               '(("User-Agent" . "Emacs my-vendor"))
+               (when auth-h (list auth-h))
+               url-request-extra-headers)))
         (condition-case err
             (progn
               (url-insert-file-contents raw-url)
@@ -573,12 +579,24 @@
 
 (defun my-vendor--download-to-file (url file &optional redirects-left)
   "Download URL to FILE; follow redirects; return t on success."
-  (let ((redirects-left (or redirects-left 4))
-        (url-request-extra-headers
-         (append '(("User-Agent" . "Emacs my-vendor"))
-                 url-request-extra-headers))
-        (url-request-timeout my/vendor-url-timeout)
-        (result nil))
+  (let* ((redirects-left (or redirects-left 4))
+         (uobj (ignore-errors (url-generic-parse-url url)))
+         (host (downcase (or (and uobj (url-host uobj)) "")))
+         (is-gh-host (or (string-match-p "\\.github\\.com\\'" host)
+                         (string-match-p "\\`github\\.com\\'" host)
+                         (string-match-p "\\`api\\.github\\.com\\'" host)
+                         (string-match-p "\\`codeload\\.github\\.com\\'" host)
+                         (string-match-p "\\`raw\\.githubusercontent\\.com\\'" host)))
+         (auth-h (when (and is-gh-host my-vendor-gh-token
+                            (not (string-empty-p my-vendor-gh-token)))
+                   (cons "Authorization" (format "Bearer %s" my-vendor-gh-token))))
+         (url-request-extra-headers
+          (append
+           '(("User-Agent" . "Emacs my-vendor"))
+           (when auth-h (list auth-h))
+           url-request-extra-headers))
+         (url-request-timeout my/vendor-url-timeout)
+         (result nil))
     (condition-case e
         (let ((buf (url-retrieve-synchronously url t t)))
           (unless buf
@@ -590,9 +608,7 @@
                   (goto-char (point-min))
                   (let ((case-fold-search t))
                     (if (not (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t))
-                        (progn
-                          (message "  ✗ download failed: malformed HTTP response from %s" url)
-                          (setq result nil))
+                        (setq result nil)
                       (let* ((code (string-to-number (match-string 1)))
                              (loc  (progn
                                      (goto-char (point-min))

@@ -29,13 +29,7 @@ First, grant Termux access to shared storage, then navigate to your `Documents` 
 
 ### Step 2: Create the Native Emacs Bootstrap File
 
-This minimal `init.el` file redirects the native app to load your main configuration. This is a one-time setup. You will need a file manager that can access `/data/data/`.
-
-1.  Navigate to `/data/data/org.gnu.emacs/files/`.
-2.  Create a folder named `.emacs.d`.
-3.  Inside that folder, create a file named `init.el` with the exact content below.
-
-**File:** `/data/data/org.gnu.emacs/files/.emacs.d/init.el`
+**File:** `~/storage/shared/Documents/.emacs.d/init.el`
 ```elisp
 ;;; Minimal Bootstrap for Native Android Emacs -*- lexical-binding: t; -*-
 ;;; This file redirects Emacs to the main configuration in shared storage.
@@ -44,4 +38,21 @@ This minimal `init.el` file redirects the native app to load your main configura
 
 (load-file (expand-file-name "early-init.el" user-emacs-directory))
 (load-file (expand-file-name "init.el" user-emacs-directory))
+```
+
+### Step 3: Set a GitHub Token to Avoid Download Failures
+
+The vendor package manager may fail due to GitHub's API rate limits. To fix this, create a personal access token and store it in a local file that is ignored by Git.
+
+**File:** `~/storage/shared/Documents/.emacs.d/lisp/init-local.el`
+```elisp
+;;; init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
+
+;; This file is for personal settings that should not be committed to Git.
+
+;; Set a GitHub personal access token to avoid API rate-limiting issues.
+(setenv "GITHUB_TOKEN" "github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+
+(provide 'init-local)
+;;; init-local.el ends here
 ```
