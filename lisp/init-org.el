@@ -40,24 +40,24 @@
 (setq org-latex-create-formula-image-program 'dvisvgm)
 (setq org-preview-latex-default-process 'dvisvgm)
 (setq org-preview-latex-process-alist
-	'((dvisvgm :programs ("latex" "dvisvgm")
-		   :description "dvi > svg"
-		   :message "you need to install the programs: latex and dvisvgm."
-		   :image-input-type "dvi"
-		   :image-output-type "svg"
-		   :image-size-adjust (1.0 . 1.0)
-		   :latex-compiler ("latex -interaction nonstopmode -output-directory %o %f")
-		   :image-converter ("dvisvgm %f -n -b min -c %S -o %O"))))
+      '((dvisvgm :programs ("latex" "dvisvgm")
+                 :description "dvi > svg"
+                 :message "you need to install the programs: latex and dvisvgm."
+                 :image-input-type "dvi"
+                 :image-output-type "svg"
+                 :image-size-adjust (1.0 . 1.0)
+                 :latex-compiler ("latex -interaction nonstopmode -output-directory %o %f")
+                 :image-converter ("dvisvgm %f -n -b min -c %S -o %O"))))
 
 ;; Customize the LaTeX header for rendering TikZ and pgfplots
 (setq org-format-latex-header
-	"\\documentclass[preview]{standalone}
-	 \\usepackage{amsmath}
-	 \\usepackage{tikz}
-	 \\usepackage{pgfplots}
-	 \\pgfplotsset{compat=1.17}
-	 \\usepackage[T1]{fontenc}
-	 \\usepackage{lmodern}")
+      "\\documentclass[preview]{standalone}
+       \\usepackage{amsmath}
+       \\usepackage{tikz}
+       \\usepackage{pgfplots}
+       \\pgfplotsset{compat=1.17}
+       \\usepackage[T1]{fontenc}
+       \\usepackage{lmodern}")
 
 ;; Ensure org-id is loaded
 (require 'org-id)
@@ -76,8 +76,6 @@
 ;; The file path is constructed by expanding the relative path
 ;; "org-id-locations" based on the value of `cache-dir`.
 (setq org-id-locations-file (expand-file-name "org-id-locations" cache-dir))
-
-;; Set the location of the org-id-locations file (moved after org-queue loading)
 
 ;; Set Org-mode to open PDF links within Emacs instead of an external application
 (with-eval-after-load 'org
@@ -106,52 +104,64 @@
 ;; Define a customizable variable for the org-agenda cache file.
 (defcustom my-org-agenda-cache-file (expand-file-name "org-agenda.cache" cache-dir)
   "File path to store the cached org-agenda-files list with a date stamp.
-When a file in org-agenda-files lies under `cache-dir`,
+For each file in org-agenda-files, if the file lies under `org-agenda-directory`,
 its path is saved relative to that directory, ensuring cross‑platform compatibility."
   :type 'string
   :group 'org-agenda)
+
+(defun my--ensure-parent-dir (file)
+  "Ensure the parent directory of FILE exists."
+  (let ((dir (file-name-directory file)))
+    (unless (file-directory-p dir)
+      (make-directory dir t))))
 
 (defun my-save-org-agenda-files-to-cache ()
   "Save `org-agenda-files` to `my-org-agenda-cache-file` with a date stamp.
 For each file in org-agenda-files, if the file is inside `org-agenda-directory`,
 its path is saved relative to that directory."
+  (my--ensure-parent-dir my-org-agenda-cache-file)
   (with-temp-file my-org-agenda-cache-file
     (let ((today (format-time-string "%Y-%m-%d"))
-	    (files-saved
-	     (delq nil
-		   (mapcar
-		    (lambda (file)
-		      (when (file-exists-p file)
-			(let ((full (file-truename file)))
-			  (if (file-in-directory-p full org-agenda-directory)
-			      (file-relative-name full org-agenda-directory)
-			    full))))
-		    org-agenda-files))))
-	(insert (prin1-to-string (list :date today :agenda-files files-saved))))))
+          (files-saved
+           (delq nil
+                 (mapcar
+                  (lambda (file)
+                    (when (file-exists-p file)
+                      (let ((full (file-truename file)))
+                        (if (file-in-directory-p full org-agenda-directory)
+                            (file-relative-name full org-agenda-directory)
+                          full))))
+                  org-agenda-files))))
+      (insert (prin1-to-string (list :date today :agenda-files files-saved))))))
 
 (defun my-load-org-agenda-files-from-cache ()
   "Load cached org agenda files from `my-org-agenda-cache-file`.
 If the saved date matches today, convert any relative paths into absolute
 paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
+  (my--ensure-parent-dir my-org-agenda-cache-file)
   (if (file-exists-p my-org-agenda-cache-file)
-	(let* ((data (with-temp-buffer
-		       (insert-file-contents my-org-agenda-cache-file)
-		       (read (buffer-string))))
-	       (saved-date (plist-get data :date))
-	       (saved-files (plist-get data :agenda-files))
-	       (today (format-time-string "%Y-%m-%d")))
-	  (if (string= saved-date today)
-	      (progn
-		(setq org-agenda-files
-		      (mapcar
-		       (lambda (path)
-			 (if (or (file-name-absolute-p path)
-				 (string-match-p "^[A-Za-z]:[/\\\\]" path))
-			     path
-			   (expand-file-name path org-agenda-directory)))
-		       saved-files))
-		t)
-	    nil))
+      (let* ((data (condition-case _
+                       (with-temp-buffer
+                         (insert-file-contents my-org-agenda-cache-file)
+                         (read (buffer-string)))
+                     (error nil))))
+        (when (and (listp data))
+          (let* ((saved-date (plist-get data :date))
+                 (saved-files (plist-get data :agenda-files))
+                 (today (format-time-string "%Y-%m-%d")))
+            (when (and (stringp saved-date)
+                       (equal saved-date today)
+                       (listp saved-files))
+              (setq org-agenda-files
+                    (mapcar
+                     (lambda (path)
+                       (if (or (file-name-absolute-p path)
+                               ;; Windows drive-letter absolute path
+                               (string-match-p "^[A-Za-z]:[\\/]" path))
+                           path
+                         (expand-file-name path org-agenda-directory)))
+                     saved-files))
+              t))))
     nil))
 
 (defun my-auto-setup-org-agenda-files ()
@@ -159,6 +169,8 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
   (unless (file-directory-p org-agenda-directory)
     (make-directory org-agenda-directory t)
     (message "Created missing org-agenda-directory: %s" org-agenda-directory))
+  ;; Ensure cache file’s parent dir exists even if init.el didn’t create it
+  (my--ensure-parent-dir my-org-agenda-cache-file)
   (if (my-load-org-agenda-files-from-cache)
       (message "Loaded org-agenda-files from cache.")
     (progn
@@ -178,9 +190,8 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
   (setq org-roam-directory org-agenda-directory)
   (setq org-roam-db-location (expand-file-name "org-roam.db" cache-dir))
   :bind (("C-c n l" . org-roam-buffer-toggle)
-	   ("C-c n f" . org-roam-node-find)
-	   ("C-c n i" . org-roam-node-insert))
-  )
+         ("C-c n f" . org-roam-node-find)
+         ("C-c n i" . org-roam-node-insert)))
 
 (use-package org-roam-ui
   :after org-roam
@@ -193,7 +204,7 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
 
 ;; Configure FSRS (Free Spaced Repetition Scheduler)
 (use-package fsrs
-  :ensure t  ;; Good practice, though vendor also handles it
+  :ensure t
   :init
   ;; This code runs BEFORE fsrs is loaded.
   ;; This is the correct place to set configuration variables.
