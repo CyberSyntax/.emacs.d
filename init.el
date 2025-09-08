@@ -29,8 +29,11 @@
 (setq debug-on-error t)
 (setq completion-styles '(substring partial-completion flex))
 
-(defvar org-agenda-directory (expand-file-name "org" user-emacs-directory)
-  "Default directory for Org files. Can be overridden in init-local.el.")
+(defvar org-agenda-directory
+  (if (eq system-type 'android)
+      "/storage/emulated/0/Documents/org"
+    (expand-file-name "org" user-emacs-directory))
+  "Default directory for Org files.")
 (setq cache-dir (expand-file-name "cache/" my-var-directory))
 (unless (file-directory-p cache-dir) (make-directory cache-dir t))
 (setq bookmark-default-file (expand-file-name "bookmarks" my-var-directory))

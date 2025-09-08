@@ -40,18 +40,13 @@ First, grant Termux access to shared storage, then navigate to your `Documents` 
 (load-file (expand-file-name "init.el" user-emacs-directory))
 ```
 
-### Step 3: Set a GitHub Token to Avoid Download Failures
-
-The vendor package manager may fail due to GitHub's API rate limits. To fix this, create a personal access token and store it in a local file that is ignored by Git.
+### Step 3: Local and private configuration
 
 **File:** `~/storage/shared/Documents/.emacs.d/lisp/init-local.el`
 ```elisp
 ;;; init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
 
 ;; This file is for personal settings that should not be committed to Git.
-
-;; Set a GitHub personal access token to avoid API rate-limiting issues.
-(setenv "GITHUB_TOKEN" "github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 
 (provide 'init-local)
 ;;; init-local.el ends here
