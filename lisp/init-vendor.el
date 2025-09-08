@@ -30,7 +30,7 @@
   "If non-nil, used for authenticated GitHub API requests to raise rate limits.")
 
 ;; Keep network waits short
-(defvar my/vendor-url-timeout 10
+(defvar my/vendor-url-timeout 120
   "Seconds to wait on each GitHub API/raw request.")
 (setq url-request-timeout my/vendor-url-timeout)
 
@@ -561,24 +561,45 @@
   (let* ((t0 (replace-regexp-in-string "[\0 ].*$" "" s)))
     (if (string-empty-p t0) 0 (string-to-number t0 8))))
 
-(defun my-vendor--download-to-file (url file)
-  "Download URL to FILE using url-retrieve-synchronously, return t on success."
-  (let ((url-request-extra-headers
+(defun my-vendor--download-to-file (url file &optional redirects-left)
+  "Download URL to FILE; follow redirects; return t on success."
+  (let ((redirects-left (or redirects-left 4))
+        (url-request-extra-headers
          (append '(("User-Agent" . "Emacs my-vendor"))
-                 url-request-extra-headers)))
+                 url-request-extra-headers))
+        (url-request-timeout my/vendor-url-timeout))
     (condition-case err
-        (let ((buf (let ((url-request-timeout my/vendor-url-timeout))
-                     (url-retrieve-synchronously url t t))))
-          (when buf
-            (unwind-protect
-                (with-current-buffer buf
-                  (goto-char (point-min))
-                  (if (re-search-forward "^\r?\n\r?\n" nil t)
-                      (let ((body-start (point)))
-                        (write-region body-start (point-max) file nil 'silent)
-                        t)
-                    nil))
-              (kill-buffer buf))))
+        (let ((buf (url-retrieve-synchronously url t t)))
+          (unless buf
+            (message "  ✗ download failed: no response from %s" url)
+            (cl-return-from my-vendor--download-to-file nil))
+          (unwind-protect
+              (with-current-buffer buf
+                (goto-char (point-min))
+                (unless (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t)
+                  (message "  ✗ download failed: malformed HTTP response from %s" url)
+                  (cl-return-from my-vendor--download-to-file nil))
+                (let* ((code (string-to-number (match-string 1)))
+                       (loc  (progn
+                               (goto-char (point-min))
+                               (when (re-search-forward "^Location: \\(.*\\)$" nil t)
+                                 (string-trim (match-string 1))))))
+                  (cond
+                   ((and loc (memq code '(301 302 303 307 308)))
+                    (if (<= redirects-left 0)
+                        (progn
+                          (message "  ✗ redirect loop from %s" url)
+                          nil)
+                      (kill-buffer buf)
+                      (my-vendor--download-to-file loc file (1- redirects-left))))
+                   ((/= code 200)
+                    (message "  ✗ HTTP %s from %s" code url)
+                    nil)
+                   (t
+                    (when (re-search-forward "^\r?\n\r?\n" nil t)
+                      (write-region (point) (point-max) file nil 'silent)
+                      t)))))
+            (kill-buffer buf)))
       (error
        (message "  ✗ download failed: %s" (error-message-string err))
        nil))))
@@ -658,41 +679,55 @@ If ONLY-UNDER is non-nil, only extract entries whose path starts with ONLY-UNDER
 
 (defun my-vendor-execute-archive-download (repo-url repo-dir)
   "Download GitHub archive tarball (main/master) and extract into REPO-DIR.
-Store identified commit/hash in last-sha.txt. Return non-nil on success."
+Tries multiple endpoints and stores hash in last-sha.txt."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
          (branches '("main" "master"))
          (ok nil))
     (dolist (br branches)
       (unless ok
-        (let* ((tar-url (format "https://codeload.github.com/%s/tar.gz/refs/heads/%s"
-                                owner-repo br))
-               (tmp (make-temp-file "vendor-" nil ".tar.gz")))
-          (message "Downloading tarball (%s)..." br)
-          (when (my-vendor--download-to-file tar-url tmp)
-            (let* ((top (my-vendor--tar-peek-topdir tmp))
-                   (sha (or (my-vendor--sha-from-topdir top)
-                            (secure-hash 'sha256 (with-temp-buffer
-                                                   (let ((coding-system-for-read 'no-conversion))
-                                                     (insert-file-contents tmp))
-                                                   (buffer-string)))))
-                   (prev (my-vendor-get-local-sha repo-dir)))
-              (if (and prev sha (string= prev sha)
-                       (my-vendor-repo-present-p repo-dir))
-                  (progn
-                    (message "  ✓ Up to date (%s)" (substring sha 0 7))
-                    (setq ok t))
-                ;; Replace content
-                (when (file-directory-p repo-dir)
-                  (delete-directory repo-dir t t))
-                (make-directory repo-dir t)
-                (message "Extracting to %s..." repo-dir)
-                (my-vendor--tar-extract tmp repo-dir 1 top)
-                (when sha (my-vendor-update-local-sha repo-dir sha))
-                (message "  ✓ Installed %s (%s)"
-                         (file-name-nondirectory repo-dir)
-                         (substring sha 0 7))
-                (setq ok t)))
-            (ignore-errors (delete-file tmp))))))
+        (let* ((candidates
+                (list
+                 (format "https://github.com/%s/archive/refs/heads/%s.tar.gz" owner-repo br)
+                 (format "https://api.github.com/repos/%s/tarball/%s" owner-repo br)
+                 (format "https://codeload.github.com/%s/tar.gz/refs/heads/%s" owner-repo br)))
+               (tmp (make-temp-file "vendor-" nil ".tar.gz"))
+               (downloaded nil))
+          (dolist (u candidates)
+            (unless downloaded
+              (let ((host (condition-case nil
+                              (url-host (url-generic-parse-url u))
+                            (error u))))
+                (message "Downloading tarball (%s) from %s..." br host))
+              (setq downloaded (my-vendor--download-to-file u tmp))))
+          (when downloaded
+            (condition-case err
+                (let* ((top (my-vendor--tar-peek-topdir tmp))
+                       (sha (or (my-vendor--sha-from-topdir top)
+                                (secure-hash 'sha256
+                                             (with-temp-buffer
+                                               (let ((coding-system-for-read 'no-conversion))
+                                                 (insert-file-contents tmp))
+                                               (buffer-string)))))
+                       (prev (my-vendor-get-local-sha repo-dir)))
+                  (if (and prev sha (string= prev sha)
+                           (my-vendor-repo-present-p repo-dir))
+                      (progn
+                        (message "  ✓ Up to date (%s)" (substring sha 0 7))
+                        (setq ok t))
+                    (when (file-directory-p repo-dir)
+                      (delete-directory repo-dir t t))
+                    (make-directory repo-dir t)
+                    (message "Extracting to %s..." repo-dir)
+                    (my-vendor--tar-extract tmp repo-dir 1 top)
+                    (when sha (my-vendor-update-local-sha repo-dir sha))
+                    (message "  ✓ Installed %s (%s)"
+                             (file-name-nondirectory repo-dir)
+                             (substring sha 0 7))
+                    (setq ok t)))
+              (error
+               (message "  ✗ Extract failed for %s: %s" owner-repo (error-message-string err))
+               (setq ok nil))))
+          (ignore-errors (delete-file tmp)))))
     ok))
 
 ;; ------------------------------ Orchestration ------------------------------
