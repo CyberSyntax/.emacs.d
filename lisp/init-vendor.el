@@ -62,6 +62,25 @@
 (defvar my-vendor-force-update nil
   "When non-nil, bypass daily throttle and update now.")
 
+;; Per-repo branch map (owner/repo -> preferred branch)
+(defvar my-vendor-branch-overrides
+  '(("bohonghuang/org-srs" . "master")
+    ("open-spaced-repetition/lisp-fsrs" . "master")
+    ("CyberSyntax/org-queue" . "main")
+    ("CyberSyntax/org-story" . "main")
+    ("CyberSyntax/hanja-reading" . "main")
+    ("CyberSyntax/org-headline-manager" . "main")
+    ("CyberSyntax/emacs-android-support-module" . "main"))
+  "Owner/repo -> preferred branch to try first.")
+
+(defun my-vendor--candidate-branches (owner-repo)
+  "Return a deduplicated list of branches to try for OWNER-REPO."
+  (let* ((override (alist-get owner-repo my-vendor-branch-overrides nil nil #'string=))
+         (def-branch (condition-case nil
+                         (my-vendor-fetch-default-branch owner-repo)
+                       (error nil))))
+    (delete-dups (delq nil (list override def-branch "main" "master")))))
+
 ;; ------------------------------ Utilities ------------------------------
 
 (defun my-vendor--json-parse-string (str)
@@ -159,12 +178,12 @@
 (defun my-vendor-get-compile-cache-dir (repo-name)
   "Get compilation cache directory for REPO-NAME."
   (let* ((config my-vendor-autonomous-config)
-         (vendor-dir (expand-file-name 
+         (vendor-dir (expand-file-name
                       (cdr (assoc 'vendor-subdir config))
                       user-emacs-directory))
          (cache-subdir (cdr (assoc 'compile-cache-subdir config)))
          (fingerprint (my-vendor-get-system-fingerprint)))
-    (expand-file-name 
+    (expand-file-name
      (format "%s/%s/%s" cache-subdir fingerprint repo-name)
      vendor-dir)))
 
@@ -174,7 +193,7 @@
     (push repo-dir load-path-additions)
     (push cache-dir load-path-additions)
     (let* ((config my-vendor-autonomous-config)
-           (vendor-dir (expand-file-name 
+           (vendor-dir (expand-file-name
                         (cdr (assoc 'vendor-subdir config))
                         user-emacs-directory)))
       (dolist (repo (cdr (assoc 'repositories config)))
@@ -250,7 +269,7 @@
                           (message "    Fixed lexical-binding in %s" relative-path))
                         (condition-case compile-err
                             (let ((byte-compile-error-on-warn (eq warning-level 'strict))
-                                  (byte-compile-warnings 
+                                  (byte-compile-warnings
                                    (pcase warning-level
                                      ('none nil)
                                      ('moderate '(obsolete))
@@ -268,7 +287,7 @@
                            (setq error-count (1+ error-count))
                            (message "    ✗ %s: %s" relative-path (error-message-string compile-err)))))))
                 (setq load-path original-load-path))
-              (message "  ✓ Compilation complete: %d compiled, %d warnings, %d errors" 
+              (message "  ✓ Compilation complete: %d compiled, %d warnings, %d errors"
                        compiled-count warning-count error-count)
               (if (> compiled-count 0) cache-dir source-dir))
           (error
@@ -400,7 +419,7 @@
             (when success
               (message "  ✓ Successfully cloned to %s" repo-dir)))
           success)
-      (error 
+      (error
        (message "  ✗ Git operation failed for %s: %s" repo-url (error-message-string err))
        nil))))
 
@@ -510,15 +529,16 @@
 (defun my-vendor-execute-raw-download (repo-url repo-dir)
   "Download raw files for REPO-URL into REPO-DIR (full repo snapshot)."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
-         (branch (condition-case _ (my-vendor-fetch-default-branch owner-repo) (error "main")))
+         (branches (my-vendor--candidate-branches owner-repo))
          (local-sha (my-vendor-get-local-sha repo-dir))
-         (remote-sha (condition-case err
-                         (or (my-vendor-fetch-latest-commit-sha owner-repo branch)
-                             (my-vendor-fetch-latest-commit-sha owner-repo "master"))
-                       (error
-                        (message "  ✗ SHA fetch failed for %s: %s - Skipping update"
-                                 owner-repo (error-message-string err))
-                        nil))))
+         (branch nil)
+         (remote-sha nil))
+    ;; Find a branch that yields a SHA
+    (dolist (br branches)
+      (unless remote-sha
+        (setq remote-sha (ignore-errors
+                           (my-vendor-fetch-latest-commit-sha owner-repo br)))
+        (when remote-sha (setq branch br))))
     (cond
      ;; No SHA and no local copy -> fail (so caller can report missing).
      ((and (null remote-sha) (not (my-vendor-repo-present-p repo-dir)))
@@ -542,9 +562,7 @@
               (delete-directory repo-dir t t)
               (message "  Deleted old repo: %s" repo-dir))
             (message "Fetching file tree for %s (%s)..." owner-repo branch)
-            (let ((tree (condition-case _
-                            (my-vendor-fetch-github-tree owner-repo branch)
-                          (error (my-vendor-fetch-github-tree owner-repo "master"))))
+            (let ((tree (my-vendor-fetch-github-tree owner-repo branch))
                   (file-count 0))
               (dolist (item tree)
                 (let ((path (alist-get 'path item))
@@ -733,8 +751,7 @@ If ONLY-UNDER is non-nil, only extract entries whose path starts with ONLY-UNDER
   "Download GitHub archive tarball and extract into REPO-DIR.
 Tries API tarball without branch (defaults to default_branch), then explicit branches."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
-         (def-branch (condition-case _ (my-vendor-fetch-default-branch owner-repo) (error nil)))
-         (branches (delete-dups (delq nil (list def-branch "main" "master"))))
+         (branches (my-vendor--candidate-branches owner-repo))
          (ok nil))
     ;; Try API tarball without specifying a branch (redirects to default branch).
     (let* ((no-branch-url (format "https://api.github.com/repos/%s/tarball" owner-repo))
@@ -804,17 +821,16 @@ Tries API tarball without branch (defaults to default_branch), then explicit bra
              (let ((ok nil))
                (pcase strategy
                  ('git-update
-                  (setq ok (my-vendor-execute-git-update url repo-dir)))
+                  (setq ok (or (my-vendor-execute-git-update url repo-dir)
+                               (my-vendor-execute-archive-download url repo-dir)
+                               (my-vendor-execute-raw-download url repo-dir))))
                  ('download-archive
-                  (setq ok (my-vendor-execute-archive-download url repo-dir)))
+                  (setq ok (or (my-vendor-execute-archive-download url repo-dir)
+                               (my-vendor-execute-raw-download url repo-dir))))
                  ('download-raw
-                  (setq ok (my-vendor-execute-raw-download url repo-dir)))
+                  (setq ok (or (my-vendor-execute-raw-download url repo-dir)
+                               (my-vendor-execute-archive-download url repo-dir))))
                  (_ (setq ok nil)))
-               ;; Fallbacks: prefer archive, then raw
-               (unless ok
-                 (setq ok (my-vendor-execute-archive-download url repo-dir)))
-               (unless ok
-                 (setq ok (my-vendor-execute-raw-download url repo-dir)))
                (when ok (setq updated-any t))))))))
     (when updated-any (my-vendor-mark-updated))
     ;; Smart compile and add to load-path
@@ -827,7 +843,7 @@ Tries API tarball without branch (defaults to default_branch), then explicit bra
               (let ((final-dir (my-vendor-compile-package-smart name source-dir)))
                 (add-to-list 'load-path final-dir)
                 (setq added-paths (1+ added-paths))
-                (message "  ✓ %s -> %s" name 
+                (message "  ✓ %s -> %s" name
                          (if (string= final-dir source-dir) "SOURCE" "COMPILED")))
             (message "  ✗ %s (missing)" name))))
       (message "=== Cross-Platform Setup Complete: %d packages ===" added-paths))))
@@ -852,9 +868,15 @@ Tries API tarball without branch (defaults to default_branch), then explicit bra
   (let* ((config my-vendor-autonomous-config)
          (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory)))
     (dolist (repo (cdr (assoc 'repositories config)))
-      (let ((name (cdr repo))
-            (dir (expand-file-name (cdr repo) vendor-dir)))
-        (message "%-28s %s" name (if (my-vendor-repo-present-p dir) "OK" "MISSING"))))))
+      (let* ((url (car repo))
+             (name (cdr repo))
+             (dir (expand-file-name name vendor-dir))
+             (owner-repo (my-vendor-extract-owner-repo url))
+             (override (alist-get owner-repo my-vendor-branch-overrides nil nil #'string=)))
+        (message "%-28s %-8s %s"
+                 name
+                 (if override (format "[%s]" override) "")
+                 (if (my-vendor-repo-present-p dir) "OK" "MISSING"))))))
 
 (defun my-vendor-toggle-compilation ()
   "Toggle auto-compilation on/off."
@@ -864,7 +886,7 @@ Tries API tarball without branch (defaults to default_branch), then explicit bra
     (message "Auto-compilation: %s" (if (not current) "ENABLED" "DISABLED"))))
 
 (defun my-vendor-force-recompile ()
-  "Force complete recompilation."
+  "Force complete recompilation of all vendor packages."
   (interactive)
   (my-vendor-clean-cache)
   (my-vendor-autonomous-setup))
@@ -876,8 +898,8 @@ Tries API tarball without branch (defaults to default_branch), then explicit bra
          (vendor-dir (expand-file-name (cdr (assoc 'vendor-subdir config)) user-emacs-directory))
          (cache-base-dir (expand-file-name (cdr (assoc 'compile-cache-subdir config)) vendor-dir)))
     (when (file-directory-p cache-base-dir)
-      (delete-directory cache-base-dir t)
-      (message "Cache cleaned: %s" cache-base-dir))))
+      (delete-directory cache-base-dir t))
+    (message "Cache cleaned: %s" cache-base-dir)))
 
 (defun my-vendor-reset-daily-throttle ()
   "Delete the daily throttle marker so next run will update."
@@ -886,8 +908,8 @@ Tries API tarball without branch (defaults to default_branch), then explicit bra
          (cache-file (expand-file-name (cdr (assoc 'cache-file config))
                                        temporary-file-directory)))
     (when (file-exists-p cache-file)
-      (delete-file cache-file)
-      (message "Removed throttle file: %s" cache-file))))
+      (delete-file cache-file))
+    (message "Removed throttle file: %s" cache-file)))
 
 (defun my-vendor-update-now ()
   "Force update vendors now (ignore daily throttle)."
