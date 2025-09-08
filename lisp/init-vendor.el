@@ -6,7 +6,7 @@
 (require 'url)
 (require 'url-parse)
 
-;; Shared small timeout for vendor network calls
+;; Keep network waits short
 (defvar my/vendor-url-timeout 6
   "Seconds to wait on each GitHub API/raw request.")
 
@@ -17,14 +17,12 @@
     (repositories . (;; Third-party vendor packages
                      ("https://github.com/bohonghuang/org-srs.git" . "org-srs")
                      ("https://github.com/open-spaced-repetition/lisp-fsrs.git" . "fsrs")
-
                      ;; My GitHub packages
                      ("https://github.com/CyberSyntax/org-queue.git" . "org-queue")
                      ("https://github.com/CyberSyntax/org-story.git" . "org-story")
                      ("https://github.com/CyberSyntax/hanja-reading.git" . "hanja-reading")
                      ("https://github.com/CyberSyntax/org-headline-manager.git" . "org-headline-manager")
-                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")
-                     ))
+                     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")))
     (update-frequency . daily)
     (auto-compile . t)
     (compile-strategy . smart)
@@ -37,7 +35,7 @@
   "Runtime data discovered about the environment.")
 
 (defun my-vendor--json-parse-string (str)
-  "Parse JSON STR, returning alist. Works on Emacs 26+."
+  "Parse JSON STR, returning alist."
   (if (fboundp 'json-parse-string)
       (json-parse-string str :object-type 'alist :array-type 'list)
     (let ((json-object-type 'alist)
@@ -131,7 +129,6 @@
   (let ((load-path-additions '()))
     (push repo-dir load-path-additions)
     (push cache-dir load-path-additions)
-
     (let* ((config my-vendor-autonomous-config)
            (vendor-dir (expand-file-name 
                         (cdr (assoc 'vendor-subdir config))
@@ -316,10 +313,10 @@
                       (cdr (assoc 'cache-file config))
                       temporary-file-directory))
          (today (format-time-string "%Y-%m-%d")))
-    (condition-case nil
-        (with-temp-file cache-file
-          (insert today))
-      (error nil))))
+  (condition-case nil
+      (with-temp-file cache-file
+        (insert today))
+    (error nil))))
 
 (defun my-vendor-execute-git-update (repo-url repo-dir)
   "Execute git operation for REPO-URL into REPO-DIR."
@@ -351,10 +348,9 @@
 (defun my-vendor-fetch-latest-commit-sha (owner-repo)
   "Fetch the latest commit SHA for OWNER-REPO's main branch from GitHub API."
   (let* ((api-url (format "https://api.github.com/repos/%s/commits/main" owner-repo))
-         (buf nil)
-         (json nil))
-    (setq buf (let ((url-request-timeout my/vendor-url-timeout))
+         (buf (let ((url-request-timeout my/vendor-url-timeout))
                 (url-retrieve-synchronously api-url t t)))
+         (json nil))
     (when buf
       (with-current-buffer buf
         (goto-char (point-min))

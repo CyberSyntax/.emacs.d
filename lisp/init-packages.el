@@ -1,12 +1,7 @@
 ;;; lisp/init-packages.el --- Robust package management (offline-safe) -*- lexical-binding: t; -*-
 
-;; This file hardens package initialization against network timeouts and adds
-;; an offline-safe bootstrap for `use-package` so your init never fails when
-;; ELPA/MELPA are unreachable.
-
-;; ===================================================================
-;; 0. Core requires and small helpers
-;; ===================================================================
+;; This hardens package initialization against network timeouts and prevents
+;; startup failures when ELPA/MELPA are unreachable.
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -14,9 +9,12 @@
 (require 'url-parse)
 (require 'package)
 
+;; ===================================================================
+;; 0) Core directories, TLS and timeouts
+;; ===================================================================
+
 (defvar my-var-directory (expand-file-name "var/" user-emacs-directory)
   "Directory for variable state files (history, caches, etc).")
-
 (unless (file-directory-p my-var-directory)
   (make-directory my-var-directory t))
 
@@ -26,15 +24,23 @@
 ;; Do not auto-enable packages before init
 (setq package-enable-at-startup nil)
 
-;; Sometimes TLS 1.3 and some GnuTLS builds cause handshake issues; prefer <= 1.2.
+;; Some older GnuTLS builds + servers can have TLS1.3 handshake issues.
 (setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
 
-;; Shorter network timeouts so init doesn't hang for long
+;; Keep network waits short so init won't block for long.
 (defvar my/url-request-timeout 6
   "Seconds to wait on a single HTTP(S) request before timing out.")
+(setq url-request-timeout my/url-request-timeout)
 
-(defvar my/allow-insecure-http-mirrors nil
-  "If non-nil, allow HTTP fallbacks to ELPA/MELPA mirrors when HTTPS fails.")
+;; Optional: set EMACS_OFFLINE=1 in your environment to force offline mode.
+(defvar my/offline-env
+  (let ((v (or (getenv "EMACS_OFFLINE") "")))
+    (member (downcase v) '("1" "true" "yes" "on")))
+  "Non-nil means force offline mode regardless of connectivity check.")
+
+;; ===================================================================
+;; 1) Proxy support from environment
+;; ===================================================================
 
 (defun my/setup-proxy-from-env ()
   "Configure `url-proxy-services` from standard *_proxy environment variables."
@@ -57,41 +63,41 @@
         (when h (push (cons "https" h) url-proxy-services))))
     (when (and no (stringp no) (not (string-empty-p no)))
       (push (cons "no_proxy" no) url-proxy-services))))
+(my/setup-proxy-from-env)
+
+;; ===================================================================
+;; 2) Connectivity detection (non-fatal, fast)
+;; ===================================================================
 
 (defun my/network-online-p ()
-  "Quickly check if we can reach at least one ELPA endpoint."
+  "Quickly check if at least one ELPA endpoint is reachable. Non-fatal."
   (let ((url-request-timeout my/url-request-timeout)
         (targets '("https://elpa.gnu.org/packages/"
                    "https://melpa.org/packages/"
-                   "https://stable.melpa.org/packages/"))
-        (ok nil))
+                   "https://stable.melpa.org/packages/")))
     (catch 'online
       (dolist (tgt targets)
         (condition-case nil
             (let ((buf (url-retrieve-synchronously tgt t t)))
               (when buf
                 (kill-buffer buf)
-                (setq ok t)
                 (throw 'online t)))
-          (error nil))))
-    ok))
+          (error nil)))
+      nil)))
+
+(defconst my/network-allowed
+  (and (not my/offline-env)
+       (my/network-online-p))
+  "Non-nil when we believe network is available and allowed.")
 
 ;; ===================================================================
-;; 1. Package archives and initialization
+;; 3) Package archives and initialization
 ;; ===================================================================
-
-(my/setup-proxy-from-env)
 
 (setq package-archives
-      (append
-       '(("GNU ELPA"     . "https://elpa.gnu.org/packages/")
-         ("MELPA Stable" . "https://stable.melpa.org/packages/")
-         ("MELPA"        . "https://melpa.org/packages/"))
-       ;; Optional mirrors with lower priority (comment/uncomment as needed)
-       (when my/allow-insecure-http-mirrors
-         '(("GNU ELPA (USTC)" . "http://mirrors.ustc.edu.cn/elpa/gnu/")
-           ("MELPA (USTC)"    . "http://mirrors.ustc.edu.cn/elpa/melpa/")
-           ("MELPA Stable (USTC)" . "http://mirrors.ustc.edu.cn/elpa/stable-melpa/")))))
+      '(("GNU ELPA"     . "https://elpa.gnu.org/packages/")
+        ("MELPA Stable" . "https://stable.melpa.org/packages/")
+        ("MELPA"        . "https://melpa.org/packages/")))
 
 (setq package-archive-priorities
       '(("GNU ELPA"     . 10)
@@ -101,63 +107,69 @@
 (package-initialize)
 
 ;; ===================================================================
-;; 2. Safer refresh with retries and per-archive tolerance
+;; 4) Suppress hard failures from package-refresh-contents when offline
+;; ===================================================================
+
+(defun my/pkg-refresh-contents-suppress-errors (orig-fn &rest args)
+  "Call ORIG-FN but suppress network errors, returning nil instead of error."
+  (let ((url-request-timeout my/url-request-timeout))
+    (condition-case err
+        (apply orig-fn args)
+      (file-error
+       (message "package-refresh-contents suppressed: %s" (error-message-string err))
+       nil)
+      (error
+       (message "package-refresh-contents suppressed (other): %s" (error-message-string err))
+       nil))))
+
+(advice-add 'package-refresh-contents :around #'my/pkg-refresh-contents-suppress-errors)
+
+;; ===================================================================
+;; 5) Resilient per-archive refresh (used only when we do refresh explicitly)
 ;; ===================================================================
 
 (defun my/package-refresh-archives-resilient (&optional retries)
   "Refresh package archives, tolerating individual archive failures.
-Retries up to RETRIES (default 2). Returns non-nil on success."
-  (let* ((retries (or retries 2))
-         (url-request-timeout my/url-request-timeout)
-         (failures '())
-         (succeeded nil))
-
+Retries up to RETRIES (default 1). Returns non-nil on success."
+  (let* ((retries (or retries 1))
+         (url-request-timeout my/url-request-timeout))
     (cl-labels ((refresh-once ()
-                  ;; Use the internal per-archive function so a single failure doesn't abort all.
-                  (setq failures '())
-                  (dolist (archive package-archives)
-                    (condition-case err
-                        (package--with-response-buffer-1
-                         (cdr archive)
-                         (lambda () (package--download-one-archive archive "archive-contents"))
-                         :file "archive-contents"
-                         :async nil
-                         :error-function (lambda (&rest _) nil)
-                         :noerror t)
-                      (error
-                       (push (car archive) failures))))
-                  ;; Rebuild the index from whatever succeeded
-                  (condition-case nil
-                      (package-read-all-archive-contents)
-                    (error nil))
-                  (setq succeeded (null failures))
-                  succeeded))
-
+                  (let ((failures '()))
+                    (dolist (archive package-archives)
+                      (condition-case _
+                          (package--with-response-buffer-1
+                           (cdr archive)
+                           (lambda () (package--download-one-archive archive "archive-contents"))
+                           :file "archive-contents"
+                           :async nil
+                           :error-function (lambda (&rest _) nil)
+                           :noerror t)
+                        (error (push (car archive) failures))))
+                    (ignore-errors (package-read-all-archive-contents))
+                    (null failures))))
       (catch 'done
-        (dotimes (i (max 1 retries))
+        (dotimes (_ (max 1 retries))
           (when (refresh-once)
             (throw 'done t))
-          (sleep-for 0.7))
-        succeeded))))
+          (sleep-for 0.5))
+        nil))))
 
 ;; ===================================================================
-;; 3. Offline-safe bootstrap for `use-package`
+;; 6) Offline-safe bootstrap for `use-package`
 ;; ===================================================================
 
-;; Define a minimal stub if the real use-package isn't available yet.
 (defun my/define-use-package-stub ()
   "Define a minimal `use-package` stub that won't error offline."
   (defvar use-package-always-ensure nil
-    "When non-nil, `use-package` ensures package is installed. Stub ignores it offline.")
+    "When non-nil, `use-package` ensures package is installed. Stub ignores offline.")
   (defmacro use-package (name &rest plist)
-    "Very small subset of `use-package`:
+    "Minimal subset of `use-package` for offline safety:
 - Evaluates :init immediately (if provided)
 - Tries (require NAME) without error
-- Evaluates :config immediately if NAME was loaded, or installs `with-eval-after-load` if not
-All other keywords are ignored by this stub."
+- Evaluates :config immediately if NAME was loaded, else via `with-eval-after-load`."
     (declare (indent defun))
-    (let* ((init   (plist-get plist :init))
-           (config (plist-get plist :config)))
+    (let ((init   (plist-get plist :init))
+          (config (plist-get plist :config)))
       `(progn
          ,@(when init `((progn ,@init)))
          (let ((loaded (require ',name nil 'noerror)))
@@ -168,47 +180,61 @@ All other keywords are ignored by this stub."
          t))))
 
 (defun my/ensure-use-package ()
-  "Ensure `use-package` is available. If offline, install a stub and try again later."
+  "Ensure `use-package` is available. If offline, install a stub."
   (or (require 'use-package nil 'noerror)
       (progn
-        (when (my/network-online-p)
+        (when my/network-allowed
           (let ((url-request-timeout my/url-request-timeout))
             (ignore-errors
               (unless package-archive-contents
-                (my/package-refresh-archives-resilient 2))
+                (my/package-refresh-archives-resilient 1))
               (package-install 'use-package))))
         (or (require 'use-package nil 'noerror)
             (progn
               (my/define-use-package-stub)
-              ;; Try to replace the stub with the real package a bit later if we come online.
+              ;; Try installing the real package later if network becomes available.
               (run-with-idle-timer
                10 nil
                (lambda ()
                  (when (and (not (featurep 'use-package))
                             (my/network-online-p))
                    (let ((url-request-timeout my/url-request-timeout))
-                     (condition-case _err
+                     (condition-case _
                          (progn
                            (unless package-archive-contents
-                             (my/package-refresh-archives-resilient 2))
+                             (my/package-refresh-archives-resilient 1))
                            (package-install 'use-package)
                            (message "Installed use-package; restart Emacs to switch from stub."))
                        (error nil))))))
               t)))))
 
-;; Bootstrap
 (my/ensure-use-package)
 
-;; We can safely set this even if the stub is active; it will be ignored.
-(setq use-package-always-ensure t)
+;; Always set this BEFORE any `use-package` forms expand.
+;; If offline, this prevents `use-package` from trying to install packages and calling ELPA.
+(setq use-package-always-ensure (and my/network-allowed t))
+
+;; As an extra safety net: if the real `use-package` is present, ensure network errors are suppressed.
+(with-eval-after-load 'use-package
+  (when (fboundp 'use-package-ensure-elpa)
+    (defun my/around-use-package-ensure-elpa (orig name ensure state)
+      (if (not my/network-allowed)
+          (progn
+            (message "use-package: skipping ensure for %s (offline)" name)
+            t)
+        (condition-case err
+            (funcall orig name ensure state)
+          (error
+           (message "use-package ensure failed for %s: %s (suppressed)" name (error-message-string err))
+           t))))
+    (advice-add 'use-package-ensure-elpa :around #'my/around-use-package-ensure-elpa)))
 
 ;; ===================================================================
-;; 4. Declare Packages (safe even when offline)
+;; 7) Declare Packages (safe even when offline)
 ;; ===================================================================
 
 (use-package yasnippet
   :init
-  ;; Ensure our snippet dir exists before loading yasnippet
   (defcustom my-yas-snippet-dir (expand-file-name "snippets/" user-emacs-directory)
     "Directory for storing YASnippet snippets."
     :type 'directory
