@@ -1,5 +1,7 @@
 ;;; early-init.el --- Bridge to Termux environment for Native Android Emacs -*- lexical-binding: t; -*-
 
+(require 'cl-lib)
+
 (when (string= system-type "android")
   (let* ((prefix "/data/data/com.termux/files/")
          (path (expand-file-name "usr/bin" prefix)))
