@@ -299,7 +299,7 @@
                           (_ nil))))))
                 (let* ((data-size size)
                        (pad (mod (- 512 (mod data-size 512)) 512)))
-                  (setq pos (+ pos 512 data-size pad))))))))))
+                  (setq pos (+ pos 512 data-size pad)))))))))))
 
 (defun my-vendor--sha-from-topdir (topdir)
   (when (and topdir (string-match "-\\([0-9a-f]\\{7,40\\}\\)\\'" topdir))
