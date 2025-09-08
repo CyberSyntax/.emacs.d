@@ -7,7 +7,7 @@
 (require 'url-parse)
 
 ;; Keep network waits short
-(defvar my/vendor-url-timeout 6
+(defvar my/vendor-url-timeout 8
   "Seconds to wait on each GitHub API/raw request.")
 
 (defvar my-vendor-autonomous-config
@@ -514,7 +514,7 @@
             (message "  ✗ %s (missing)" name))))
       (message "=== Cross-Platform Setup Complete: %d packages ===" added-paths))))
 
-;; Execute setup (safe even when offline; will pick readonly/fallback as needed)
+;; Execute setup
 (my-vendor-autonomous-setup)
 
 (defun my-vendor-status ()
