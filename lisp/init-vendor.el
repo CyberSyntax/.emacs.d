@@ -577,43 +577,43 @@
         (url-request-extra-headers
          (append '(("User-Agent" . "Emacs my-vendor"))
                  url-request-extra-headers))
-        (url-request-timeout my/vendor-url-timeout))
-    (condition-case err
+        (url-request-timeout my/vendor-url-timeout)
+        (result nil))
+    (condition-case e
         (let ((buf (url-retrieve-synchronously url t t)))
           (unless buf
             (message "  ✗ download failed: no response from %s" url)
-            (cl-return-from my-vendor--download-to-file nil))
-          (unwind-protect
-              (with-current-buffer buf
-                (goto-char (point-min))
-                (let ((case-fold-search t))
-                  (unless (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t)
-                    (message "  ✗ download failed: malformed HTTP response from %s" url)
-                    (cl-return-from my-vendor--download-to-file nil))
-                  (let* ((code (string-to-number (match-string 1)))
-                         (loc  (progn
-                                 (goto-char (point-min))
-                                 (when (re-search-forward "^Location: \\(.*\\)$" nil t)
-                                   (string-trim (match-string 1))))))
-                    (cond
-                     ((and loc (memq code '(301 302 303 307 308)))
-                      (if (<= redirects-left 0)
-                          (progn
-                            (message "  ✗ redirect loop from %s" url)
-                            nil)
-                        (kill-buffer buf)
-                        (my-vendor--download-to-file loc file (1- redirects-left))))
-                     ((/= code 200)
-                      (message "  ✗ HTTP %s from %s" code url)
-                      nil)
-                     (t
-                      (when (re-search-forward "^\r?\n\r?\n" nil t)
-                        (write-region (point) (point-max) file nil 'silent)
-                        t)))))))
-            (kill-buffer buf)))
+            (setq result nil))
+          (when buf
+            (unwind-protect
+                (with-current-buffer buf
+                  (goto-char (point-min))
+                  (let ((case-fold-search t))
+                    (if (not (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t))
+                        (progn
+                          (message "  ✗ download failed: malformed HTTP response from %s" url)
+                          (setq result nil))
+                      (let* ((code (string-to-number (match-string 1)))
+                             (loc  (progn
+                                     (goto-char (point-min))
+                                     (when (re-search-forward "^Location: \\(.*\\)$" nil t)
+                                       (string-trim (match-string 1))))))
+                        (cond
+                         ((and loc (memq code '(301 302 303 307 308)))
+                          (if (<= redirects-left 0)
+                              (message "  ✗ redirect loop from %s" url)
+                            (setq result (my-vendor--download-to-file loc file (1- redirects-left)))))
+                         ((/= code 200)
+                          (message "  ✗ HTTP %s from %s" code url))
+                         (t
+                          (when (re-search-forward "^\r?\n\r?\n" nil t)
+                            (write-region (point) (point-max) file nil 'silent)
+                            (setq result t))))))))
+              (kill-buffer buf))))
       (error
-       (message "  ✗ download failed: %s" (error-message-string err))
-       nil)))
+       (message "  ✗ download failed: %s" (error-message-string e))
+       (setq result nil)))
+    result))
 
 (defun my-vendor--tar-peek-topdir (tarfile)
   "Return top-level dir inside TARFILE (string without trailing slash), or nil.
