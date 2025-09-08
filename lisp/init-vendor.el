@@ -613,7 +613,7 @@
             (kill-buffer buf)))
       (error
        (message "  ✗ download failed: %s" (error-message-string err))
-       nil))))
+       nil)))
 
 (defun my-vendor--tar-peek-topdir (tarfile)
   "Return top-level dir inside TARFILE (string without trailing slash), or nil.
