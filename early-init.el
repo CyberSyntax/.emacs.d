@@ -1,6 +1,21 @@
 ;;; early-init.el --- Android environment tweaks (no Termux dependency) -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
+(require 'subr-x)
+
+;; Make a GitHub token available as early as possible so init-vendor sees it.
+;; Priority:
+;;   1) Respect existing env GITHUB_TOKEN (if already set)
+;;   2) Else, read ~/.emacs.d/.github-token if present (single line with the token)
+(let* ((token-env (getenv "GITHUB_TOKEN"))
+       (token-file (expand-file-name ".github-token" user-emacs-directory))
+       (token-file-val (when (and (not token-env) (file-readable-p token-file))
+                         (string-trim (with-temp-buffer
+                                        (insert-file-contents token-file)
+                                        (buffer-string)))))
+       (token (or token-env token-file-val)))
+  (when (and token (not (string-empty-p token)))
+    (setenv "GITHUB_TOKEN" token)))
 
 ;; On native Android Emacs, avoid assuming Termux exists.
 ;; If Termux is actually installed and its directories are accessible,

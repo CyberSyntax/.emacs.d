@@ -31,6 +31,12 @@
 (setq bookmark-default-file (expand-file-name "bookmarks" my-var-directory))
 
 ;; ===================================================================
+;; Load machine-specific settings EARLY (so env like GITHUB_TOKEN is set before init-vendor)
+;; ===================================================================
+
+(load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
+
+;; ===================================================================
 ;; Load Modules
 ;; ===================================================================
 
@@ -72,12 +78,8 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 ;; Final Steps
 ;; ===================================================================
 
-;; Load machine-specific settings, if any.
-(load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
-
 (message "Emacs configuration successfully loaded.")
 
-;;; init.el ends here
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
