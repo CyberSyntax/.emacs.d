@@ -408,10 +408,11 @@
 
 (defun my-vendor-extract-owner-repo (repo-url)
   "Extract 'owner/repo' from REPO-URL."
-  (let ((clean-url (replace-regexp-in-string "\\.git$" "" repo-url)))
-    (if (string-match "github\\.com/\\(.*\\)$" clean-url)
-        (match-string 1 clean-url)
-      (error "Invalid GitHub URL: %s" repo-url))))
+  (let* ((clean (replace-regexp-in-string "\\.git\\'" "" repo-url))
+         (m (and (string-match "github\\.com/\\([^?#]+\\)" clean)
+                 (match-string 1 clean))))
+    (unless m (error "Invalid GitHub URL: %s" repo-url))
+    (replace-regexp-in-string "/\\'" "" m)))
 
 (defun my-vendor-fetch-default-branch (owner-repo)
   "Get the repository default branch via GitHub API (fallback to main/master)."
@@ -503,9 +504,7 @@
 (defun my-vendor-execute-raw-download (repo-url repo-dir)
   "Download raw files for REPO-URL into REPO-DIR (full repo snapshot)."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
-         (branch (condition-case _
-                     (my-vendor-fetch-default-branch owner-repo)
-                   (error "main")))
+         (branch (condition-case _ (my-vendor-fetch-default-branch owner-repo) (error "main")))
          (local-sha (my-vendor-get-local-sha repo-dir))
          (remote-sha (condition-case err
                          (or (my-vendor-fetch-latest-commit-sha owner-repo branch)
@@ -514,43 +513,54 @@
                         (message "  ✗ SHA fetch failed for %s: %s - Skipping update"
                                  owner-repo (error-message-string err))
                         nil))))
-    (if (and remote-sha
-             (or (null local-sha) (not (string= local-sha remote-sha))))
-        (condition-case err
-            (progn
-              (when (file-directory-p repo-dir)
-                (delete-directory repo-dir t t)
-                (message "  Deleted old repo: %s" repo-dir))
-              (message "Fetching file tree for %s (%s)..." owner-repo branch)
-              (let ((tree (condition-case _
-                             (my-vendor-fetch-github-tree owner-repo branch)
-                           (error (my-vendor-fetch-github-tree owner-repo "master"))))
-                    (file-count 0))
-                (dolist (item tree)
-                  (let ((path (alist-get 'path item))
-                        (type (alist-get 'type item)))
-                    (cond
-                     ((string= type "tree")
-                      (make-directory (expand-file-name path repo-dir) t))
-                     ((string= type "blob")
-                      (let ((local-file (expand-file-name path repo-dir)))
-                        (when (my-vendor-download-raw-file owner-repo branch path local-file)
-                          (setq file-count (1+ file-count))))))))
-                (if (> file-count 0)
-                    (progn
-                      (my-vendor-update-local-sha repo-dir remote-sha)
-                      (message "  ✓ Downloaded %d files to %s (SHA %s)"
-                               file-count repo-dir (substring remote-sha 0 7))
-                      t)
-                  (message "  ✗ No files downloaded for %s" owner-repo)
-                  nil)))
-          (error 
-           (message "  ✗ Raw download failed for %s: %s" owner-repo (error-message-string err))
-           nil))
-      (progn
-        (message "  ✓ Skipping download for %s—already up to date (SHA %s)"
-                 owner-repo (if local-sha (substring local-sha 0 7) "none"))
-        t))))
+    (cond
+     ;; No SHA and no local copy -> fail (so caller can report missing).
+     ((and (null remote-sha) (not (my-vendor-repo-present-p repo-dir)))
+      (message "  ✗ Skipping download for %s—no SHA and no local copy" owner-repo)
+      nil)
+     ;; No SHA but local copy exists -> treat as success (no change).
+     ((null remote-sha)
+      (message "  ✓ Skipping download for %s—couldn’t determine remote SHA; leaving existing copy"
+               owner-repo)
+      t)
+     ;; SHA unchanged -> no work needed.
+     ((and local-sha (string= local-sha remote-sha))
+      (message "  ✓ Skipping download for %s—already up to date (SHA %s)"
+               owner-repo (substring remote-sha 0 7))
+      t)
+     ;; Download full tree and write files.
+     (t
+      (condition-case err
+          (progn
+            (when (file-directory-p repo-dir)
+              (delete-directory repo-dir t t)
+              (message "  Deleted old repo: %s" repo-dir))
+            (message "Fetching file tree for %s (%s)..." owner-repo branch)
+            (let ((tree (condition-case _
+                            (my-vendor-fetch-github-tree owner-repo branch)
+                          (error (my-vendor-fetch-github-tree owner-repo "master"))))
+                  (file-count 0))
+              (dolist (item tree)
+                (let ((path (alist-get 'path item))
+                      (type (alist-get 'type item)))
+                  (cond
+                   ((string= type "tree")
+                    (make-directory (expand-file-name path repo-dir) t))
+                   ((string= type "blob")
+                    (let ((local-file (expand-file-name path repo-dir)))
+                      (when (my-vendor-download-raw-file owner-repo branch path local-file)
+                        (setq file-count (1+ file-count))))))))
+              (if (> file-count 0)
+                  (progn
+                    (my-vendor-update-local-sha repo-dir remote-sha)
+                    (message "  ✓ Downloaded %d files to %s (SHA %s)"
+                             file-count repo-dir (substring remote-sha 0 7))
+                    t)
+                (message "  ✗ No files downloaded for %s" owner-repo)
+                nil)))
+        (error
+         (message "  ✗ Raw download failed for %s: %s" owner-repo (error-message-string err))
+         nil))))))
 
 ;; ------------------------------ Tarball HTTP path (pure Emacs) ------------------------------
 
@@ -576,29 +586,30 @@
           (unwind-protect
               (with-current-buffer buf
                 (goto-char (point-min))
-                (unless (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t)
-                  (message "  ✗ download failed: malformed HTTP response from %s" url)
-                  (cl-return-from my-vendor--download-to-file nil))
-                (let* ((code (string-to-number (match-string 1)))
-                       (loc  (progn
-                               (goto-char (point-min))
-                               (when (re-search-forward "^Location: \\(.*\\)$" nil t)
-                                 (string-trim (match-string 1))))))
-                  (cond
-                   ((and loc (memq code '(301 302 303 307 308)))
-                    (if (<= redirects-left 0)
-                        (progn
-                          (message "  ✗ redirect loop from %s" url)
-                          nil)
-                      (kill-buffer buf)
-                      (my-vendor--download-to-file loc file (1- redirects-left))))
-                   ((/= code 200)
-                    (message "  ✗ HTTP %s from %s" code url)
-                    nil)
-                   (t
-                    (when (re-search-forward "^\r?\n\r?\n" nil t)
-                      (write-region (point) (point-max) file nil 'silent)
-                      t)))))
+                (let ((case-fold-search t))
+                  (unless (re-search-forward "^HTTP/[0-9.]+ \\([0-9]+\\)" nil t)
+                    (message "  ✗ download failed: malformed HTTP response from %s" url)
+                    (cl-return-from my-vendor--download-to-file nil))
+                  (let* ((code (string-to-number (match-string 1)))
+                         (loc  (progn
+                                 (goto-char (point-min))
+                                 (when (re-search-forward "^Location: \\(.*\\)$" nil t)
+                                   (string-trim (match-string 1))))))
+                    (cond
+                     ((and loc (memq code '(301 302 303 307 308)))
+                      (if (<= redirects-left 0)
+                          (progn
+                            (message "  ✗ redirect loop from %s" url)
+                            nil)
+                        (kill-buffer buf)
+                        (my-vendor--download-to-file loc file (1- redirects-left))))
+                     ((/= code 200)
+                      (message "  ✗ HTTP %s from %s" code url)
+                      nil)
+                     (t
+                      (when (re-search-forward "^\r?\n\r?\n" nil t)
+                        (write-region (point) (point-max) file nil 'silent)
+                        t)))))))
             (kill-buffer buf)))
       (error
        (message "  ✗ download failed: %s" (error-message-string err))
@@ -677,57 +688,66 @@ If ONLY-UNDER is non-nil, only extract entries whose path starts with ONLY-UNDER
   (when (and topdir (string-match "-\\([0-9a-f]\\{7,40\\}\\)\\'" topdir))
     (match-string 1 topdir)))
 
+(defun my-vendor--extract-archive (tarfile repo-dir owner-repo)
+  "Extract an already-downloaded TARFILE into REPO-DIR; record SHA; return non-nil on success."
+  (condition-case err
+      (let* ((top (my-vendor--tar-peek-topdir tarfile))
+             (sha (or (my-vendor--sha-from-topdir top)
+                      (secure-hash
+                       'sha256
+                       (with-temp-buffer
+                         (let ((coding-system-for-read 'no-conversion))
+                           (insert-file-contents tarfile))
+                         (buffer-string))))))
+        (when (file-directory-p repo-dir)
+          (delete-directory repo-dir t t))
+        (make-directory repo-dir t)
+        (message "Extracting to %s..." repo-dir)
+        (my-vendor--tar-extract tarfile repo-dir 1 top)
+        (when sha (my-vendor-update-local-sha repo-dir sha))
+        (message "  ✓ Installed %s (%s)"
+                 (file-name-nondirectory repo-dir)
+                 (substring sha 0 7))
+        t)
+    (error
+     (message "  ✗ Extract failed for %s: %s" owner-repo (error-message-string err))
+     nil)))
+
 (defun my-vendor-execute-archive-download (repo-url repo-dir)
-  "Download GitHub archive tarball (main/master) and extract into REPO-DIR.
-Tries multiple endpoints and stores hash in last-sha.txt."
+  "Download GitHub archive tarball and extract into REPO-DIR.
+Tries API tarball without branch (defaults to default_branch), then explicit branches."
   (let* ((owner-repo (my-vendor-extract-owner-repo repo-url))
-         (branches '("main" "master"))
+         (def-branch (condition-case _ (my-vendor-fetch-default-branch owner-repo) (error nil)))
+         (branches (delete-dups (delq nil (list def-branch "main" "master"))))
          (ok nil))
-    (dolist (br branches)
-      (unless ok
-        (let* ((candidates
-                (list
-                 (format "https://github.com/%s/archive/refs/heads/%s.tar.gz" owner-repo br)
-                 (format "https://api.github.com/repos/%s/tarball/%s" owner-repo br)
-                 (format "https://codeload.github.com/%s/tar.gz/refs/heads/%s" owner-repo br)))
-               (tmp (make-temp-file "vendor-" nil ".tar.gz"))
-               (downloaded nil))
-          (dolist (u candidates)
-            (unless downloaded
-              (let ((host (condition-case nil
-                              (url-host (url-generic-parse-url u))
-                            (error u))))
-                (message "Downloading tarball (%s) from %s..." br host))
-              (setq downloaded (my-vendor--download-to-file u tmp))))
-          (when downloaded
-            (condition-case err
-                (let* ((top (my-vendor--tar-peek-topdir tmp))
-                       (sha (or (my-vendor--sha-from-topdir top)
-                                (secure-hash 'sha256
-                                             (with-temp-buffer
-                                               (let ((coding-system-for-read 'no-conversion))
-                                                 (insert-file-contents tmp))
-                                               (buffer-string)))))
-                       (prev (my-vendor-get-local-sha repo-dir)))
-                  (if (and prev sha (string= prev sha)
-                           (my-vendor-repo-present-p repo-dir))
-                      (progn
-                        (message "  ✓ Up to date (%s)" (substring sha 0 7))
-                        (setq ok t))
-                    (when (file-directory-p repo-dir)
-                      (delete-directory repo-dir t t))
-                    (make-directory repo-dir t)
-                    (message "Extracting to %s..." repo-dir)
-                    (my-vendor--tar-extract tmp repo-dir 1 top)
-                    (when sha (my-vendor-update-local-sha repo-dir sha))
-                    (message "  ✓ Installed %s (%s)"
-                             (file-name-nondirectory repo-dir)
-                             (substring sha 0 7))
-                    (setq ok t)))
-              (error
-               (message "  ✗ Extract failed for %s: %s" owner-repo (error-message-string err))
-               (setq ok nil))))
-          (ignore-errors (delete-file tmp)))))
+    ;; Try API tarball without specifying a branch (redirects to default branch).
+    (let* ((no-branch-url (format "https://api.github.com/repos/%s/tarball" owner-repo))
+           (tmp (make-temp-file "vendor-" nil ".tar.gz")))
+      (message "Downloading tarball (default) from api.github.com...")
+      (when (my-vendor--download-to-file no-branch-url tmp)
+        (setq ok (my-vendor--extract-archive tmp repo-dir owner-repo)))
+      (ignore-errors (delete-file tmp)))
+    ;; If that failed, try explicit branches and multiple endpoints.
+    (unless ok
+      (dolist (br branches)
+        (unless ok
+          (let* ((candidates
+                  (list
+                   (format "https://api.github.com/repos/%s/tarball/%s" owner-repo br)
+                   (format "https://github.com/%s/archive/refs/heads/%s.tar.gz" owner-repo br)
+                   (format "https://codeload.github.com/%s/tar.gz/refs/heads/%s" owner-repo br)))
+                 (tmp (make-temp-file "vendor-" nil ".tar.gz"))
+                 (downloaded nil))
+            (dolist (u candidates)
+              (unless downloaded
+                (let ((host (condition-case nil
+                                (url-host (url-generic-parse-url u))
+                              (error u))))
+                  (message "Downloading tarball (%s) from %s..." br host))
+                (setq downloaded (my-vendor--download-to-file u tmp))))
+            (when downloaded
+              (setq ok (my-vendor--extract-archive tmp repo-dir owner-repo)))
+            (ignore-errors (delete-file tmp))))))
     ok))
 
 ;; ------------------------------ Orchestration ------------------------------
