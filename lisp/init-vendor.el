@@ -1,19 +1,23 @@
-;;; lisp/init-vendor.el --- One-shot vendor fetcher (fast on subsequent runs) -*- lexical-binding: t; -*-
+;;; lisp/init-vendor.el --- One-shot vendor install; zero work after success -*- lexical-binding: t; -*-
 
-;; Principle:
-;; - First run: install only missing vendor repos. No updates, no version checks.
-;; - From second run onward: do nothing except add existing vendor dirs to load-path.
-;; - Global behavior only (no per-project state).
+;; Behavior:
+;; - First run (no deps record): install only missing vendor repos; then, if all required
+;;   libraries (ELPA+vendor) are locatable, write var/deps.done with "ok".
+;; - Subsequent runs (deps record present): do nothing except add vendor paths to load-path.
+;;   No network, no per-repo validation, no updates, no logs.
 
 (require 'cl-lib)
 (require 'subr-x)
 (require 'url)
 (require 'url-parse)
 
-;; Completion record shared with init-packages.el
+;; -------------------------------------------------------------------
+;; Completion record
+;; -------------------------------------------------------------------
+
 (defconst my-deps-record-file
   (expand-file-name "var/deps.done" user-emacs-directory)
-  "If this file exists and contains \"ok\", dependency setup is considered complete.")
+  "If this file contains \"ok\", dependency setup is considered complete (skip all work).")
 
 (defvar my-deps-complete
   (and (file-exists-p my-deps-record-file)
@@ -24,9 +28,15 @@
            (re-search-forward "\\bok\\b" nil t))))
   "Non-nil means deps were previously installed; vendor should perform no installs/updates.")
 
-;; -----------------------------------------------------------------------------
-;; Configuration
-;; -----------------------------------------------------------------------------
+(defun my-deps--record-success ()
+  (make-directory (file-name-directory my-deps-record-file) t)
+  (with-temp-file my-deps-record-file
+    (insert "ok\n"))
+  (setq my-deps-complete t))
+
+;; -------------------------------------------------------------------
+;; Config
+;; -------------------------------------------------------------------
 
 (defvar my-vendor-directory
   (expand-file-name "lisp/vendor" user-emacs-directory)
@@ -35,7 +45,7 @@
 (defvar my-vendor-url-timeout 120
   "Timeout in seconds for HTTP(S) downloads.")
 
-;; Repository list: (URL-OR-OWNER/REPO . LOCAL-DIR-NAME)
+;; (URL-OR-OWNER/REPO . LOCAL-DIR-NAME)
 (defvar my-vendor-repositories
   '(("https://github.com/bohonghuang/org-srs.git"                . "org-srs")
     ("https://github.com/open-spaced-repetition/lisp-fsrs.git"   . "fsrs")
@@ -46,7 +56,7 @@
     ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module"))
   "Alist of GitHub repos to fetch and their local directory names.")
 
-;; STRICT branch overrides: only these branches are used.
+;; Strict branch for each repo
 (defvar my-vendor-branch-overrides
   '(("bohonghuang/org-srs"                      . "master")
     ("open-spaced-repetition/lisp-fsrs"         . "master")
@@ -55,11 +65,18 @@
     ("CyberSyntax/hanja-reading"                . "main")
     ("CyberSyntax/org-headline-manager"         . "main")
     ("CyberSyntax/emacs-android-support-module" . "main"))
-  "Owner/repo -> branch. Only these branches are used.")
+  "Owner/repo -> fixed branch to use.")
 
-;; -----------------------------------------------------------------------------
+;; Required libs (ELPA + vendor). When all are locatable, we write deps.done.
+(defconst my-required-libraries
+  '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
+    "yasnippet" "org-web-tools" "transient"
+    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support")
+  "Libraries that must be locatable before recording completion.")
+
+;; -------------------------------------------------------------------
 ;; Helpers
-;; -----------------------------------------------------------------------------
+;; -------------------------------------------------------------------
 
 (defun my-vendor--ensure-dir (dir)
   (unless (file-directory-p dir)
@@ -91,14 +108,12 @@
 (defun my-vendor--download-to-file (url file)
   "Download URL into FILE using url-copy-file. Return t on success."
   (let ((url-request-timeout my-vendor-url-timeout))
-    (condition-case err
+    (condition-case _err
         (progn
           (when (file-exists-p file) (delete-file file))
           (url-copy-file url file t)
           (file-exists-p file))
-      (error
-       (message "Download failed: %s (%s)" url (error-message-string err))
-       nil))))
+      (error nil))))
 
 (defun my-vendor--codeload-url (owner-repo branch)
   (format "https://codeload.github.com/%s/tar.gz/refs/heads/%s" owner-repo branch))
@@ -106,10 +121,7 @@
 (defun my-vendor--github-archive-url (owner-repo branch)
   (format "https://github.com/%s/archive/refs/heads/%s.tar.gz" owner-repo branch))
 
-;; -----------------------------------------------------------------------------
-;; Minimal tar extractor (pure elisp, strip top-level directory)
-;; -----------------------------------------------------------------------------
-
+;; Minimal .tar.gz extractor (no external tools)
 (defun my-vendor--trim-nul (s)
   (if (not s) "" (if (string-match "\0" s) (substring s 0 (match-beginning 0)) s)))
 
@@ -159,22 +171,17 @@
                        (pad (mod (- 512 (mod data-size 512)) 512)))
                   (setq pos (+ pos 512 data-size pad)))))))))))
 
-;; -----------------------------------------------------------------------------
-;; Installers (missing-only)
-;; -----------------------------------------------------------------------------
-
+;; Installers (missing-only, no updates)
 (defun my-vendor--call-git (&rest args)
   "Call git with ARGS; return t on exit code 0."
   (let ((status (apply #'call-process "git" nil nil nil args)))
     (zerop status)))
 
-(defun my-vendor--git-install-if-missing (url owner-repo branch repo-dir)
-  "Clone OWNER-REPO@BRANCH into REPO-DIR if missing. Return t if present after."
+(defun my-vendor--git-install-if-missing (url branch repo-dir)
+  "Clone URL@BRANCH into REPO-DIR if missing. Return t if present after."
   (if (file-directory-p repo-dir)
       t
-    (progn
-      (message "Vendor git clone: %s (%s)" owner-repo branch)
-      (my-vendor--call-git "clone" "--depth" "1" "--branch" branch url repo-dir))))
+    (my-vendor--call-git "clone" "--depth" "1" "--branch" branch url repo-dir)))
 
 (defun my-vendor--tarball-install-if-missing (owner-repo branch repo-dir)
   "Download and extract tarball for OWNER-REPO@BRANCH into REPO-DIR if missing.
@@ -188,62 +195,52 @@ Return t if present after."
                                   (my-vendor--github-archive-url owner-repo branch))))
             (dolist (u candidates)
               (unless ok
-                (message "Vendor tarball: %s (%s) from %s"
-                         owner-repo branch
-                         (condition-case nil
-                             (url-host (url-generic-parse-url u))
-                           (error u)))
                 (when (my-vendor--download-to-file u tmp)
                   (make-directory repo-dir t)
                   (my-vendor--tar-extract tmp repo-dir 1)
-                  (setq ok t)
-                  (message "Installed %s" repo-dir)))))
+                  (setq ok t)))))
         (ignore-errors (delete-file tmp)))
       (and ok (file-directory-p repo-dir)))))
 
-;; -----------------------------------------------------------------------------
-;; Load-path integration (fast path on subsequent runs)
-;; -----------------------------------------------------------------------------
-
+;; Load-path integration
 (defun my-vendor--add-paths ()
-  "Add all existing vendor directories to `load-path`."
+  "Add vendor directories to `load-path` (no existence checks)."
   (dolist (entry my-vendor-repositories)
-    (let* ((local-dir (cdr entry))
-           (dir (my-vendor--repo-dir local-dir)))
-      (when (file-directory-p dir)
-        (add-to-list 'load-path dir)))))
+    (add-to-list 'load-path (my-vendor--repo-dir (cdr entry)))))
 
-;; -----------------------------------------------------------------------------
+;; Completion check (ELPA + vendor features)
+(defun my-deps-all-present-p ()
+  (cl-every #'locate-library my-required-libraries))
+
+;; -------------------------------------------------------------------
 ;; Orchestration
-;; -----------------------------------------------------------------------------
+;; -------------------------------------------------------------------
 
 (defun my-vendor-autonomous-setup ()
-  "Install missing vendor repos on first run; thereafter only add paths.
-No updates are performed. No version checks."
+  "First run: install missing vendor repos; then, if all libs present, record completion.
+Later runs: add paths only; no installs, no updates, no checks."
   (my-vendor--ensure-dir my-vendor-directory)
-  (if my-deps-complete
-      (progn
-        ;; Completed: fastest path, no network work.
-        (my-vendor--add-paths)
-        t)
-    ;; First run: install only what is missing, then add paths.
-    (let ((installed 0))
-      (dolist (entry my-vendor-repositories)
-        (let* ((spec (car entry))
-               (local-dir (cdr entry))
-               (owner-repo (my-vendor--normalize-owner-repo spec))
-               (branch (my-vendor--branch-for owner-repo))
-               (repo-dir (my-vendor--repo-dir local-dir)))
-          (when (and branch (not (file-directory-p repo-dir)))
-            (let* ((url (if (string-match-p "\\`https://github\\.com/" spec)
-                            spec
-                          (format "https://github.com/%s.git" owner-repo)))
-                   (ok (if (my-vendor--use-git-p)
-                           (my-vendor--git-install-if-missing url owner-repo branch repo-dir)
-                         (my-vendor--tarball-install-if-missing owner-repo branch repo-dir))))
-              (when ok (setq installed (1+ installed)))))))
-      (my-vendor--add-paths)
-      installed)))
+  (my-vendor--add-paths)
+  (when (not my-deps-complete)
+    ;; Install missing vendor repos only; no per-repo validation or updates.
+    (dolist (entry my-vendor-repositories)
+      (let* ((spec (car entry))
+             (local-dir (cdr entry))
+             (owner-repo (my-vendor--normalize-owner-repo spec))
+             (branch (my-vendor--branch-for owner-repo))
+             (repo-dir (my-vendor--repo-dir local-dir)))
+        (when (and branch (not (file-directory-p repo-dir)))
+          (let ((url (if (string-match-p "\\`https://github\\.com/" spec)
+                         spec
+                       (format "https://github.com/%s.git" owner-repo))))
+            (or (and (my-vendor--use-git-p)
+                     (my-vendor--git-install-if-missing url branch repo-dir))
+                (my-vendor--tarball-install-if-missing owner-repo branch repo-dir))))))
+
+    ;; If every required library is now locatable, mark completion.
+    (when (my-deps-all-present-p)
+      (my-deps--record-success)))
+  t)
 
 (provide 'init-vendor)
 
