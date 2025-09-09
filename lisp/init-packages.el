@@ -271,7 +271,15 @@ Only used on first run."
 
 ;; Add missing libs to silence byte-compilation/load errors.
 (use-package deferred :ensure t)
-(use-package magit :ensure t)
+
+(defun my-enable-magit-if-git ()
+  "Enable Magit only if the `git` executable is available."
+  (when (executable-find "git")
+    (use-package magit
+      :ensure t
+      :defer t)))
+
+(my-enable-magit-if-git)
 
 (provide 'init-packages)
 
