@@ -27,15 +27,15 @@
   (expand-file-name "lisp/vendor" user-emacs-directory))
 (defvar my-vendor-url-timeout 120)
 
-;; SPEC may be owner/repo, https://github.com/owner/repo(.git), or git@github.com:owner/repo(.git)
+;; Use simple owner/repo specs to avoid any regex edge-cases.
 (defvar my-vendor-repositories
-  '(("https://github.com/bohonghuang/org-srs.git"                . "org-srs")
-    ("https://github.com/open-spaced-repetition/lisp-fsrs.git"   . "fsrs")
-    ("https://github.com/CyberSyntax/org-queue.git"              . "org-queue")
-    ("https://github.com/CyberSyntax/org-story.git"              . "org-story")
-    ("https://github.com/CyberSyntax/hanja-reading.git"          . "hanja-reading")
-    ("https://github.com/CyberSyntax/org-headline-manager.git"   . "org-headline-manager")
-    ("https://github.com/CyberSyntax/emacs-android-support-module.git" . "android-support-module")))
+  '(("bohonghuang/org-srs"                      . "org-srs")
+    ("open-spaced-repetition/lisp-fsrs"         . "fsrs")
+    ("CyberSyntax/org-queue"                    . "org-queue")
+    ("CyberSyntax/org-story"                    . "org-story")
+    ("CyberSyntax/hanja-reading"                . "hanja-reading")
+    ("CyberSyntax/org-headline-manager"         . "org-headline-manager")
+    ("CyberSyntax/emacs-android-support-module" . "android-support-module")))
 
 (defvar my-vendor-branch-overrides
   '(("bohonghuang/org-srs"                      . "master")
@@ -126,7 +126,6 @@ Accepts: owner/repo, https://github.com/owner/repo(.git)/?, git@github.com:owner
             (if (string-match-p "\\`\$$?:\\x00\\{512\\}\$$+\\'" block)
                 (setq pos (+ pos 512))
               (let* ((name   (field block 0 100))
-                     (mode   (field block 100 8))
                      (size   (oct   block 124 12))
                      (type   (let ((c (aref block 156))) (if (= c 0) ?0 c)))
                      (prefix (field block 345 155))
