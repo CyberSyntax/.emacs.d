@@ -197,7 +197,8 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
          ("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert))
   :config
-  (org-roam-db-autosync-mode 1))
+  ;; (org-roam-db-autosync-mode 1)
+  )
 
 (use-package org-roam-ui
   :after org-roam
