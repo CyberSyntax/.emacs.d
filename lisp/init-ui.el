@@ -15,24 +15,21 @@ Returns either FAMILY (string), a (font-spec :file ...), or nil."
     (cond
      ;; 1) Family first
      (family-installed family)
-
      ;; 2) File-based (internal first)
      ((file-readable-p internal-file)
       (font-spec :file internal-file))
-
-     ;; 3) Shared file: Android → copy-once to internal; others → use shared directly
+     ;; 3) Shared file: Android → copy once to internal; others → use shared directly
      ((file-readable-p shared-file)
       (if (eq system-type 'android)
           (progn
             (make-directory internal-dir t)
-            ;; Copy only if it doesn't exist; do not overwrite
+            ;; Copy only if it does not exist; do not overwrite
             (unless (file-exists-p internal-file)
               (ignore-errors (copy-file shared-file internal-file)))
             (when (file-readable-p internal-file)
               (font-spec :file internal-file)))
         ;; Non-Android can use the shared file directly
         (font-spec :file shared-file)))
-
      ;; Nothing found
      (t nil))))
 
@@ -43,7 +40,9 @@ Returns either FAMILY (string), a (font-spec :file ...), or nil."
    ((eq system-type 'darwin)
     (set-face-attribute 'default nil :family "Noto Serif")
     (when can-font
-      (set-fontset-font t '(#xE000 . #xE039) "CMUO Serif" nil 'prepend)
+      ;; PUA range: apply CMUO Serif first
+      (set-fontset-font t '(#xE000 . #xF8FF) "CMUO Serif" nil 'prepend)
+      ;; Han glyphs: apply Noto Serif TC next
       (set-fontset-font t 'han "Noto Serif TC" nil 'prepend)))
 
    ;; Android
