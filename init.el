@@ -37,8 +37,10 @@
 (defvar org-agenda-directory
   (if (eq system-type 'android)
       "/storage/emulated/0/Documents/org"
-    (expand-file-name "org" user-emacs-directory))
-  "Default directory for Org files.")
+    ;; on macOS/Linux/Windows:
+    (expand-file-name "Documents/org" (getenv "HOME")))
+  "Directory containing org agenda files.
+Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 (setq cache-dir (expand-file-name "cache/" my-var-directory))
 (unless (file-directory-p cache-dir) (make-directory cache-dir t))
 (setq bookmark-default-file (expand-file-name "bookmarks" my-var-directory))
