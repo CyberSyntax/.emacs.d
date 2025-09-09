@@ -269,6 +269,10 @@ Only used on first run."
   :config
   (setq transient-history-file (expand-file-name "transient-history.el" my-var-directory)))
 
+;; Add missing libs to silence byte-compilation/load errors.
+(use-package deferred :ensure t)
+(use-package magit :ensure t)
+
 (provide 'init-packages)
 
 ;;; lisp/init-packages.el ends here

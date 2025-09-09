@@ -27,6 +27,7 @@
   (expand-file-name "lisp/vendor" user-emacs-directory))
 (defvar my-vendor-url-timeout 120)
 
+;; SPEC may be owner/repo, https://github.com/owner/repo(.git), or git@github.com:owner/repo(.git)
 (defvar my-vendor-repositories
   '(("https://github.com/bohonghuang/org-srs.git"                . "org-srs")
     ("https://github.com/open-spaced-repetition/lisp-fsrs.git"   . "fsrs")
@@ -55,17 +56,18 @@
   (unless (file-directory-p dir) (make-directory dir t)))
 
 (defun my-vendor--normalize-owner-repo (spec)
-  "Turn SPEC into \"owner/repo\"."
+  "Turn SPEC into \"owner/repo\".
+Accepts: owner/repo, https://github.com/owner/repo(.git)/?, git@github.com:owner/repo(.git)"
   (cond
    ;; Plain owner/repo
    ((and (stringp spec)
          (string-match-p "\\`[[:alnum:]-]+/[[:alnum:]._+-]+\\'" spec))
     spec)
-   ;; https://github.com/owner/repo(.git)?(/)?
+   ;; https URL
    ((and (stringp spec)
          (string-match "\\`https://github\\.com/\$$[^/]+/[^/]+\$$\$$?:\\.git\$$?/?\\'" spec))
     (match-string 1 spec))
-   ;; git@github.com:owner/repo(.git)?
+   ;; SSH URL
    ((and (stringp spec)
          (string-match "\\`git@github\\.com:\$$[^/]+/[^/]+\$$\$$?:\\.git\$$?\\'" spec))
     (match-string 1 spec))
@@ -102,6 +104,7 @@
 (defun my-vendor--parse-octal (s)
   (let ((s1 (and s (replace-regexp-in-string "[\0 ].*$" "" s))))
     (if (or (null s1) (string-empty-p s1)) 0 (string-to-number s1 8))))
+
 (defun my-vendor--tar-extract (tarfile dest &optional strip-components)
   "Extract TARFILE to DEST, removing STRIP-COMPONENTS leading path parts."
   (setq dest (file-name-as-directory dest))
@@ -119,9 +122,11 @@
            (oct (b off len) (my-vendor--parse-octal (substring b off (+ off len)))))
         (while (<= (+ pos 512) end)
           (let ((block (blk pos 512)))
+            ;; End-of-archive blocks (512 NUL bytes), possibly repeated
             (if (string-match-p "\\`\$$?:\\x00\\{512\\}\$$+\\'" block)
                 (setq pos (+ pos 512))
               (let* ((name   (field block 0 100))
+                     (mode   (field block 100 8))
                      (size   (oct   block 124 12))
                      (type   (let ((c (aref block 156))) (if (= c 0) ?0 c)))
                      (prefix (field block 345 155))
@@ -148,10 +153,12 @@
 (defun my-vendor--call-git (&rest args)
   (let ((status (apply #'call-process "git" nil nil nil args)))
     (zerop status)))
+
 (defun my-vendor--git-install-if-missing (url branch repo-dir)
   (if (file-directory-p repo-dir)
       t
     (my-vendor--call-git "clone" "--depth" "1" "--branch" branch url repo-dir)))
+
 (defun my-vendor--tarball-install-if-missing (owner-repo branch repo-dir)
   (if (file-directory-p repo-dir)
       t
@@ -197,9 +204,10 @@ Later runs: only add paths. No updates, no checks."
         (when (and branch
                    (not (file-directory-p repo-dir))
                    (not (locate-library local-dir)))
-          (let ((url (if (string-match-p "\\`https://github\\.com/" spec)
-                         spec
-                       (format "https://github.com/%s.git" owner-repo))))
+          (let ((url (cond
+                      ((string-match-p "\\`https://github\\.com/" spec) spec)
+                      ((string-match-p "\\`git@github\\.com:" spec) spec)
+                      (t (format "https://github.com/%s.git" owner-repo)))))
             (or (and (my-vendor--use-git-p)
                      (my-vendor--git-install-if-missing url branch repo-dir))
                 (my-vendor--tarball-install-if-missing owner-repo branch repo-dir))))))
