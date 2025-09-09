@@ -6,6 +6,11 @@
 
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 
+(require 'init-deps)
+;; If not yet complete, perform the one-time installs now.
+(unless my-deps-complete
+  (my-deps-install-if-needed))
+
 (defvar my-var-directory (expand-file-name "var/" user-emacs-directory)
   "Directory for storing volatile data like caches, history, etc.")
 (unless (file-directory-p my-var-directory)

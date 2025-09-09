@@ -1,10 +1,24 @@
-;;; lisp/init-packages.el --- Robust package management with mirror fallback -*- lexical-binding: t; -*-
+;;; lisp/init-packages.el --- One-shot-fast packages bootstrap -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 (require 'subr-x)
 (require 'url)
 (require 'url-parse)
 (require 'package)
+
+;; Global completion record: when present, all dependency work must be skipped.
+(defconst my-deps-record-file
+  (expand-file-name "var/deps.done" user-emacs-directory)
+  "If this file exists and contains \"ok\", dependency setup is considered complete.")
+
+(defvar my-deps-complete
+  (and (file-exists-p my-deps-record-file)
+       (ignore-errors
+         (with-temp-buffer
+           (insert-file-contents my-deps-record-file)
+           (goto-char (point-min))
+           (re-search-forward "\\bok\\b" nil t))))
+  "Non-nil means all dependencies were previously installed; skip installs and refreshes.")
 
 ;; Core behavior and directories
 (setq byte-compile-warnings '(not free-vars obsolete))
@@ -19,7 +33,7 @@
 ;; TLS tweaks (some networks/servers have TLS1.3 handshake quirks)
 (setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
 
-;; Keep network waits short so init won't block too long.
+;; Keep network waits short so init won't block too long on first run.
 (defvar my/url-request-timeout 8
   "Seconds to wait on a single HTTP(S) request before timing out.")
 (setq url-request-timeout my/url-request-timeout)
@@ -30,7 +44,7 @@
     (member (downcase v) '("1" "true" "yes" "on")))
   "Non-nil means force offline mode regardless of connectivity check.")
 
-;; Proxy support from environment
+;; Proxy support from environment (cheap; safe to run always)
 (defun my/setup-proxy-from-env ()
   "Configure `url-proxy-services` from *_proxy environment variables."
   (let* ((hp (or (getenv "http_proxy") (getenv "HTTP_PROXY")))
@@ -54,7 +68,7 @@
       (push (cons "no_proxy" no) url-proxy-services))))
 (my/setup-proxy-from-env)
 
-;; Connectivity probe (kept for diagnostics; no longer gates mirror selection)
+;; Connectivity probe (kept for first run only)
 (defun my/network-online-p ()
   "Quickly check if the network is reachable."
   (let ((url-request-timeout my/url-request-timeout))
@@ -64,8 +78,12 @@
       (error nil))))
 
 (defconst my/network-allowed
-  (and (not my/offline-env) (my/network-online-p))
-  "Non-nil when we believe network is available and allowed.")
+  (and (not my/offline-env) (not my-deps-complete) (my/network-online-p))
+  "Non-nil when we believe network is available and allowed (and deps not complete).")
+
+;; -------------------------------------------------------------------
+;; ELPA mirrors (first run only)
+;; -------------------------------------------------------------------
 
 (defvar my/elpa-mirror-sets
   '((gnu "https://elpa.gnu.org/packages/"
@@ -97,7 +115,7 @@
       (unwind-protect
           (with-current-buffer buf
             (goto-char (point-min))
-            (if (re-search-forward "^HTTP/1\\.[01] \\([0-9]+\\)" nil t)
+            (if (re-search-forward "^HTTP/1\\.[01] \$$[0-9]+\$$" nil t)
                 (let ((code (string-to-number (match-string 1))))
                   (and (>= code 200) (< code 400)))
               t))
@@ -118,7 +136,8 @@
     (nreverse chosen)))
 
 (defun my/bootstrap-package-archives ()
-  "Set `package-archives` to the first working mirrors and set priorities."
+  "Set `package-archives` to the first working mirrors and set priorities.
+Only used on first run."
   (let ((selected (my/select-elpa-mirrors)))
     (if selected
         (progn
@@ -136,7 +155,7 @@
       (message "No ELPA mirrors reachable; operating without package archives."))))
 
 (defun my/package-refresh-archives-with-fallback (&optional timeout)
-  "Refresh archives once using selected mirrors."
+  "Refresh archives once using selected mirrors (first run only)."
   (let ((url-request-timeout (or timeout my/url-request-timeout)))
     (condition-case err
         (progn
@@ -148,7 +167,7 @@
        (message "package-refresh-contents suppressed: %s" (error-message-string err))
        nil))))
 
-;; Suppress hard errors from any other call to package-refresh-contents
+;; Suppress any hard errors from calls to package-refresh-contents
 (defun my/pkg-refresh-contents-suppress-errors (orig-fn &rest args)
   (let ((url-request-timeout my/url-request-timeout))
     (condition-case err
@@ -158,12 +177,24 @@
        nil))))
 (advice-add 'package-refresh-contents :around #'my/pkg-refresh-contents-suppress-errors)
 
-;; Initialize package.el and bootstrap archives
-(package-initialize)
-(my/bootstrap-package-archives)
-(my/package-refresh-archives-with-fallback)
+;; On completed runs, completely no-op any refresh attempts for maximum speed.
+(when my-deps-complete
+  (advice-add 'package-refresh-contents :override (lambda (&rest _) nil)))
 
-;; Resilient `use-package` bootstrap (with offline stub)
+;; Initialize package.el
+(package-initialize)
+
+;; First-run bootstrap only (archives + one refresh); skipped entirely if completed
+(unless my-deps-complete
+  (my/bootstrap-package-archives)
+  (my/package-refresh-archives-with-fallback))
+
+;; -------------------------------------------------------------------
+;; Resilient `use-package` bootstrap
+;; - First run: try to install; fallback to stub if offline.
+;; - Later runs (my-deps-complete): never attempt network; stub if missing.
+;; -------------------------------------------------------------------
+
 (defun my/define-use-package-stub ()
   "Define a minimal `use-package` stub that won't error offline."
   (defvar use-package-always-ensure nil
@@ -182,51 +213,43 @@
          t))))
 
 (defun my/ensure-use-package ()
-  "Ensure `use-package` is available. Install or stub."
+  "Ensure `use-package` is available, respecting completion record."
   (or (require 'use-package nil 'noerror)
       (progn
-        (when package-archives
-          (let ((url-request-timeout my/url-request-timeout))
-            (ignore-errors
-              (unless package-archive-contents
-                (my/package-refresh-archives-with-fallback))
-              (package-install 'use-package))))
-        (or (require 'use-package nil 'noerror)
+        (if (or my-deps-complete (not my/network-allowed))
+            ;; Do not attempt network when completed or offline; just stub.
             (progn
               (my/define-use-package-stub)
-              (run-with-idle-timer
-               10 nil
-               (lambda ()
-                 (when (and (not (featurep 'use-package))
-                            (my/network-online-p))
-                   (let ((url-request-timeout my/url-request-timeout))
-                     (condition-case _
-                         (progn
-                           (unless package-archive-contents
-                             (my/package-refresh-archives-with-fallback))
-                           (package-install 'use-package)
-                           (message "Installed use-package; restart Emacs to use the real package."))
-                       (error nil))))))
-              t)))))
+              t)
+          ;; First run with network: try to install real use-package once.
+          (ignore-errors
+            (unless package-archive-contents
+              (my/package-refresh-archives-with-fallback))
+            (package-install 'use-package))
+          (or (require 'use-package nil 'noerror)
+              (progn
+                (my/define-use-package-stub)
+                t))))))
 (my/ensure-use-package)
 
-(setq use-package-always-ensure (and package-archives t))
+;; On completed runs, never install packages from use-package (even if :ensure t is present)
+(when (and my-deps-complete (featurep 'use-package))
+  (defun my/skip-ensure-elpa--completed (_orig name ensure state &optional _no-refresh)
+    (ignore name ensure state)
+    (message "use-package: skipping ensure (deps completed)"))
+  (with-eval-after-load 'use-package
+    (when (fboundp 'use-package-ensure-elpa)
+      (advice-add 'use-package-ensure-elpa :around #'my/skip-ensure-elpa--completed))))
 
-(with-eval-after-load 'use-package
-  (when (fboundp 'use-package-ensure-elpa)
-    (defun my/around-use-package-ensure-elpa (orig name ensure state &optional no-refresh)
-      (if (not package-archives)
-          (progn
-            (message "use-package: skipping ensure for %s (no reachable package archives)" name)
-            t)
-        (condition-case err
-            (funcall orig name ensure state no-refresh)
-          (error
-           (message "use-package ensure failed for %s: %s (suppressed)" name (error-message-string err))
-           t))))
-    (advice-add 'use-package-ensure-elpa :around #'my/around-use-package-ensure-elpa)))
+;; Default ensure policy:
+;; - First run: allow installs on demand via use-package.
+;; - Completed runs: never install automatically.
+(setq use-package-always-ensure (and (not my-deps-complete) (and package-archives t)))
 
-;; Packages
+;; -------------------------------------------------------------------
+;; Packages (declarations remain; ensures obey the policy above)
+;; -------------------------------------------------------------------
+
 (use-package yasnippet
   :init
   (defcustom my-yas-snippet-dir (expand-file-name "snippets/" user-emacs-directory)
