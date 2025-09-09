@@ -27,25 +27,23 @@
   (expand-file-name "lisp/vendor" user-emacs-directory))
 (defvar my-vendor-url-timeout 120)
 
-;; Use simple owner/repo specs to avoid any regex edge-cases.
+;; Keep only repos that are NOT on MELPA (org-srs and fsrs are on MELPA now).
+;; Use owner/repo form to avoid URL parsing issues.
 (defvar my-vendor-repositories
-  '(("bohonghuang/org-srs"                      . "org-srs")
-    ("open-spaced-repetition/lisp-fsrs"         . "fsrs")
-    ("CyberSyntax/org-queue"                    . "org-queue")
+  '(("CyberSyntax/org-queue"                    . "org-queue")
     ("CyberSyntax/org-story"                    . "org-story")
     ("CyberSyntax/hanja-reading"                . "hanja-reading")
     ("CyberSyntax/org-headline-manager"         . "org-headline-manager")
     ("CyberSyntax/emacs-android-support-module" . "android-support-module")))
 
 (defvar my-vendor-branch-overrides
-  '(("bohonghuang/org-srs"                      . "master")
-    ("open-spaced-repetition/lisp-fsrs"         . "master")
-    ("CyberSyntax/org-queue"                    . "main")
+  '(("CyberSyntax/org-queue"                    . "main")
     ("CyberSyntax/org-story"                    . "main")
     ("CyberSyntax/hanja-reading"                . "main")
     ("CyberSyntax/org-headline-manager"         . "main")
     ("CyberSyntax/emacs-android-support-module" . "main")))
 
+;; This list is used only to decide when to write deps.done (all present).
 (defconst my-required-libraries
   '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
     "yasnippet" "org-web-tools" "transient"
@@ -175,12 +173,12 @@ Accepts: owner/repo, https://github.com/owner/repo(.git)/?, git@github.com:owner
         (ignore-errors (delete-file tmp)))
       (and ok (file-directory-p repo-dir)))))
 
-;; Load-path
+;; Load-path (append so ELPA packages take precedence if both exist)
 (defun my-vendor--add-paths ()
   (dolist (entry my-vendor-repositories)
     (let ((dir (my-vendor--repo-dir (cdr entry))))
       (when (file-directory-p dir)
-        (add-to-list 'load-path dir)))))
+        (add-to-list 'load-path dir t)))))
 
 ;; Presence check (ELPA + vendor)
 (defun my-deps-all-present-p ()
@@ -195,18 +193,15 @@ Later runs: only add paths. No updates, no checks."
   (unless my-deps-complete
     (dolist (entry my-vendor-repositories)
       (let* ((spec (car entry))
-             (local-dir (cdr entry))    ;; assume main library matches local-dir
+             (local-dir (cdr entry))
              (owner-repo (my-vendor--normalize-owner-repo spec))
              (branch (my-vendor--branch-for owner-repo))
              (repo-dir (my-vendor--repo-dir local-dir)))
-        ;; Install only if directory missing AND the library is not already available via ELPA.
         (when (and branch
                    (not (file-directory-p repo-dir))
+                   ;; Only install if not already available via ELPA
                    (not (locate-library local-dir)))
-          (let ((url (cond
-                      ((string-match-p "\\`https://github\\.com/" spec) spec)
-                      ((string-match-p "\\`git@github\\.com:" spec) spec)
-                      (t (format "https://github.com/%s.git" owner-repo)))))
+          (let ((url (format "https://github.com/%s.git" owner-repo)))
             (or (and (my-vendor--use-git-p)
                      (my-vendor--git-install-if-missing url branch repo-dir))
                 (my-vendor--tarball-install-if-missing owner-repo branch repo-dir))))))
