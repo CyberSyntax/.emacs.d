@@ -57,11 +57,17 @@
 (defun my-vendor--normalize-owner-repo (spec)
   "Turn SPEC into \"owner/repo\"."
   (cond
+   ;; Plain owner/repo
    ((and (stringp spec)
          (string-match-p "\\`[[:alnum:]-]+/[[:alnum:]._+-]+\\'" spec))
     spec)
+   ;; https://github.com/owner/repo(.git)?(/)?
    ((and (stringp spec)
-         (string-match "\\`https://github\\.com/\$$[^/]+/[^/]+\$$\$$?:\\.git\$$?\\'" spec))
+         (string-match "\\`https://github\\.com/\$$[^/]+/[^/]+\$$\$$?:\\.git\$$?/?\\'" spec))
+    (match-string 1 spec))
+   ;; git@github.com:owner/repo(.git)?
+   ((and (stringp spec)
+         (string-match "\\`git@github\\.com:\$$[^/]+/[^/]+\$$\$$?:\\.git\$$?\\'" spec))
     (match-string 1 spec))
    (t
     (error "Unrecognized repo spec: %S" spec))))
