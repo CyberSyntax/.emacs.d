@@ -1,10 +1,8 @@
 ;;; lisp/init-vendor.el --- One-shot vendor install; zero work after success -*- lexical-binding: t; -*-
 
-;; Behavior:
-;; - First run (no deps record): install only missing vendor repos; then, if all required
-;;   libraries (ELPA+vendor) are locatable, write var/deps.done with "ok".
-;; - Subsequent runs (deps record present): do nothing except add vendor paths to load-path.
-;;   No network, no per-repo validation, no updates, no logs.
+;; Behavior
+;; - First run (no deps record): install only missing vendor repos, then add paths.
+;; - Subsequent runs (deps record present): add paths only. No network, no per-repo checks, no updates.
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -12,7 +10,7 @@
 (require 'url-parse)
 
 ;; -------------------------------------------------------------------
-;; Completion record
+;; Completion record (shared with init-deps / init-packages)
 ;; -------------------------------------------------------------------
 
 (defconst my-deps-record-file
@@ -27,12 +25,6 @@
            (goto-char (point-min))
            (re-search-forward "\\bok\\b" nil t))))
   "Non-nil means deps were previously installed; vendor should perform no installs/updates.")
-
-(defun my-deps--record-success ()
-  (make-directory (file-name-directory my-deps-record-file) t)
-  (with-temp-file my-deps-record-file
-    (insert "ok\n"))
-  (setq my-deps-complete t))
 
 ;; -------------------------------------------------------------------
 ;; Config
@@ -67,13 +59,6 @@
     ("CyberSyntax/emacs-android-support-module" . "main"))
   "Owner/repo -> fixed branch to use.")
 
-;; Required libs (ELPA + vendor). When all are locatable, we write deps.done.
-(defconst my-required-libraries
-  '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
-    "yasnippet" "org-web-tools" "transient"
-    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support")
-  "Libraries that must be locatable before recording completion.")
-
 ;; -------------------------------------------------------------------
 ;; Helpers
 ;; -------------------------------------------------------------------
@@ -89,7 +74,7 @@
          (string-match-p "\\`[[:alnum:]-]+/[[:alnum:]._+-]+\\'" spec))
     spec)
    ((and (stringp spec)
-         (string-match "\\`https://github\\.com/\$$[^?#]+?\$$\$$?:\\.git\$$?\\'" spec))
+         (string-match "\\`https://github\\.com/\$$[^/]+/[^/]+\$$\$$?:\\.git\$$?\\'" spec))
     (match-string 1 spec))
    (t
     (error "Unrecognized repo spec: %S" spec))))
@@ -204,25 +189,25 @@ Return t if present after."
 
 ;; Load-path integration
 (defun my-vendor--add-paths ()
-  "Add vendor directories to `load-path` (no existence checks)."
+  "Add vendor directories to `load-path`."
   (dolist (entry my-vendor-repositories)
-    (add-to-list 'load-path (my-vendor--repo-dir (cdr entry)))))
-
-;; Completion check (ELPA + vendor features)
-(defun my-deps-all-present-p ()
-  (cl-every #'locate-library my-required-libraries))
+    (let ((dir (my-vendor--repo-dir (cdr entry))))
+      (when (file-directory-p dir)
+        (add-to-list 'load-path dir)))))
 
 ;; -------------------------------------------------------------------
 ;; Orchestration
 ;; -------------------------------------------------------------------
 
 (defun my-vendor-autonomous-setup ()
-  "First run: install missing vendor repos; then, if all libs present, record completion.
-Later runs: add paths only; no installs, no updates, no checks."
+  "First run: install missing vendor repos only; then add paths.
+Later runs (deps done): add paths only; no installs, no checks, no updates."
   (my-vendor--ensure-dir my-vendor-directory)
-  (my-vendor--add-paths)
-  (when (not my-deps-complete)
-    ;; Install missing vendor repos only; no per-repo validation or updates.
+  (if my-deps-complete
+      (progn
+        (my-vendor--add-paths)
+        t)
+    ;; First run: install missing only (silent), then add paths.
     (dolist (entry my-vendor-repositories)
       (let* ((spec (car entry))
              (local-dir (cdr entry))
@@ -236,11 +221,8 @@ Later runs: add paths only; no installs, no updates, no checks."
             (or (and (my-vendor--use-git-p)
                      (my-vendor--git-install-if-missing url branch repo-dir))
                 (my-vendor--tarball-install-if-missing owner-repo branch repo-dir))))))
-
-    ;; If every required library is now locatable, mark completion.
-    (when (my-deps-all-present-p)
-      (my-deps--record-success)))
-  t)
+    (my-vendor--add-paths)
+    t))
 
 (provide 'init-vendor)
 
