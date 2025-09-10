@@ -131,7 +131,8 @@ PRIORITY is ignored; kept for API clarity."
 ;;;; macOS (preserve existing, known-good setup)
 
 (when (and (fboundp 'set-fontset-font)
-           (eq system-type 'darwin))
+           (eq system-type 'darwin)
+           (not (bound-and-true-p cnfonts-mode)))
   ;; Rationale for macOS:
   ;; - Use a simple fontset built from an ASCII base to avoid XLFD issues.
   ;; - PUA → CMUO Serif (contains PUA glyphs).
