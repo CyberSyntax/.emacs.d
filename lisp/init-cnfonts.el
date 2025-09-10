@@ -68,19 +68,26 @@
              (fam (or (cl-find-if (lambda (s) (string-match-p "\\bCMUO\\b" s)) fams)
                       (cl-find-if (lambda (s) (string-match-p "\\bCMU\\b.*\\bSerif\\b" s)) fams))))
         (cond
-         ;; If a CMUO/CMU Serif family is visible, use it.
+         ;; If a CMUO/CMU Serif family is visible, use it (both current and default), with 'replace to outrank others.
          (fam
-          (set-fontset-font "fontset-default" pua-range fam nil 'prepend)
-          (message "[cnfonts] PUA → family %s" fam))
-         ;; macOS only: fallback to repo file, prefer TTF then OTF
+          (set-fontset-font nil               pua-range fam nil 'replace)
+          (set-fontset-font "fontset-default" pua-range fam nil 'replace)
+          (when (eq system-type 'darwin)
+            (setq use-default-font-for-symbols nil))
+          (message "[cnfonts] PUA → family %s (replace)%s"
+                   fam (if (eq system-type 'darwin) ", symbols=nil" "")))
+         ;; macOS only: fallback to repo file, prefer TTF then OTF (Android text backend ignores :file for PUA)
          ((eq system-type 'darwin)
           (let* ((try (list
                        (expand-file-name "fonts/CMUOSerif-Roman.ttf" user-emacs-directory)
                        (expand-file-name "fonts/CMUOSerif-Roman.otf" user-emacs-directory)))
                  (file (cl-find-if #'file-readable-p try)))
             (when file
-              (set-fontset-font "fontset-default" pua-range (font-spec :file file) nil 'prepend)
-              (message "[cnfonts] PUA → file %s" (file-name-nondirectory file)))))))))
+              (set-fontset-font nil               pua-range (font-spec :file file) nil 'replace)
+              (set-fontset-font "fontset-default" pua-range (font-spec :file file) nil 'replace)
+              (setq use-default-font-for-symbols nil)
+              (message "[cnfonts] PUA → file %s (replace), symbols=nil"
+                       (file-name-nondirectory file)))))))))
 
   ;; Run after cnfonts has set its fonts, and once more at startup (helps Android timing)
   (with-eval-after-load 'cnfonts

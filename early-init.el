@@ -2,6 +2,7 @@
 
 (require 'cl-lib)
 (require 'subr-x)
+(require 'timer)  ;; fix: avoid (void-function timerp) during early redisplay on some Android builds
 
 ;; 0) Disable VC on Android when git isn't available (prevents git ls-files calls on open)
 (when (eq system-type 'android)
@@ -39,7 +40,7 @@
       (setq exec-path (cl-remove-if-not #'file-accessible-directory-p exec-path))
       (add-to-list 'exec-path bin t))))
 
-;; 3) Android: auto-sync fonts from repo → Emacs internal ~/fonts
+;; 3) Android: auto-sync fonts from repo → Emacs internal ~/fonts (TTF preferred)
 (when (eq system-type 'android)
   (defvar my/android-fonts-src-dir (expand-file-name "fonts" user-emacs-directory))
   (defvar my/android-legacy-fonts-dir (expand-file-name "~/.emacs.d/fonts"))
