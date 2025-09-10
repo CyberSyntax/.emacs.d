@@ -132,7 +132,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
             (unless quiet (init-ui/log "Han mapped to %s" fam))
             fam)
         (unless quiet (init-ui/log "No Han-capable family visible to Emacs"))
-        nil)))
+        nil))
 
   (defun init-ui/android-apply-fonts ()
     (init-ui/log "Android font-backend: %S" (frame-parameter nil 'font-backend))
@@ -151,7 +151,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
     (let* ((re (regexp-opt '("One UI" "Noto" "Source" "CJK" "SEC" "Samsung" "Nanum")))
            (fams (cl-remove-if-not (lambda (s) (string-match-p re s)) (font-family-list))))
       (message "CJK-ish families: %S" fams)
-      fams)))
+      fams))
 
 ;; Platform-agnostic UI tweaks
 (global-visual-line-mode 1)
