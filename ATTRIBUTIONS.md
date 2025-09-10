@@ -9,7 +9,7 @@ This repository contains original code by CyberSyntax (see `LICENSE`) and refere
   - License: SIL Open Font License 1.1 (see `fonts/CMUO/OFL.txt`).
   - Source: https://github.com/Tzetachi/Computer-Modern-Unicode-Oesol
 
-- Noto Serif TC
+- Noto CJK fonts
   - Copyright 2012–2024 Google LLC.
   - License: SIL Open Font License 1.1 (see `fonts/NotoSerifTC/OFL.txt`).
   - Source: https://github.com/notofonts/noto-cjk
