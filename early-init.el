@@ -41,12 +41,10 @@
 
 ;; 3) Android: auto-sync fonts from repo → Emacs internal ~/fonts
 (when (eq system-type 'android)
-  (defvar my/android-fonts-src-dir (expand-file-name "fonts" user-emacs-directory)
-    "Source dir inside repo that holds font files.")
-  (defvar my/android-fonts-dst-dir (expand-file-name "~/fonts")
-    "Destination dir Emacs-Android scans for fonts.")
-  (defvar my/android-fonts-extensions '("ttf" "otf" "ttc" "otc")
-    "Font file extensions to sync.")
+  (defvar my/android-fonts-src-dir (expand-file-name "fonts" user-emacs-directory))
+  (defvar my/android-legacy-fonts-dir (expand-file-name "~/.emacs.d/fonts"))
+  (defvar my/android-fonts-dst-dir (expand-file-name "~/fonts"))
+  (defvar my/android-fonts-extensions '("ttf" "otf" "ttc" "otc"))
 
   (defun my/android--font-file-p (path)
     (and (file-regular-p path)
@@ -63,30 +61,51 @@
                (sd (file-attribute-size ad)))
           (or (time-less-p md ms) (not (= ss sd))))))
 
+  (defun my/android--collect-fonts (dir)
+    (when (file-directory-p dir)
+      (directory-files-recursively dir "\\.\\(ttf\\|otf\\|ttc\\|otc\\)\\'")))
+
   (defun my/android-sync-fonts (&optional quiet)
-    "Copy fonts from repo fonts to Emacs internal ~/fonts if newer or missing.
-Returns the number of files copied."
+    "Copy all fonts from repo fonts/ and legacy ~/.emacs.d/fonts/ into ~/fonts.
+- Safe copy flags for Android (preserve uid/gid = nil).
+- If both TTF and OTF exist for same basename, TTF wins.
+Returns number of files copied."
     (interactive)
-    (let* ((src my/android-fonts-src-dir)
-           (dst my/android-fonts-dst-dir)
+    (let* ((dst my/android-fonts-dst-dir)
+           (srcs (append (my/android--collect-fonts my/android-fonts-src-dir)
+                         (my/android--collect-fonts my/android-legacy-fonts-dir)))
+           (by-base (make-hash-table :test 'equal))
            (copied 0))
-      (when (file-directory-p src)
-        (make-directory dst t)
-        (dolist (f (directory-files-recursively src "."))
-          (when (my/android--font-file-p f)
-            (let* ((rel (file-relative-name f src))
-                   (out (expand-file-name rel dst)))
-              (make-directory (file-name-directory out) t)
-              (when (my/android--newer-or-missing-p f out)
-                (condition-case e
-                    (progn
-                      (copy-file f out t t nil)  ;; overwrite, preserve mtime, DO NOT preserve uid/gid
-                      (cl-incf copied))
-                  (error (unless quiet
-                           (message "[fonts] copy failed %s -> %s: %s"
-                                    f out (error-message-string e)))))))))
-        (unless quiet
-          (message "[fonts] synced %d file(s) from %s → %s" copied src dst)))
+      ;; Index by base name without extension; prefer TTF if seen.
+      (dolist (f srcs)
+        (let* ((bn (file-name-base f))
+               (ext (downcase (file-name-extension f "")))
+               (key bn)
+               (cur (gethash key by-base)))
+          (cond
+           ((and (string= ext "ttf"))
+            (puthash key f by-base))                  ;; TTF always overrides prior
+           ((null cur))                               ;; no prior, accept
+           ((and cur (not (string= (downcase (file-name-extension cur "")) "ttf")))
+            (puthash key f by-base)))))               ;; overwrite only if not TTF
+      (make-directory dst t)
+      (maphash
+       (lambda (_k src)
+         (let* ((rel (file-name-nondirectory src))
+                (out (expand-file-name rel dst)))
+           (make-directory (file-name-directory out) t)
+           (when (my/android--newer-or-missing-p src out)
+             (condition-case e
+                 (progn
+                   ;; OK-IF-EXISTS=t, KEEP-TIME=t, PRESERVE-UID/GID=nil (Android-safe)
+                   (copy-file src out t t nil)
+                   (cl-incf copied))
+               (error (unless quiet
+                        (message "[fonts] copy failed %s -> %s: %s"
+                                 src out (error-message-string e))))))))
+       by-base)
+      (unless quiet
+        (message "[fonts] synced %d file(s) → %s" copied dst))
       copied))
 
   ;; Run very early so families exist before cnfonts/init-ui touch fonts

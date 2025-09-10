@@ -31,9 +31,10 @@
   (defun my/first-present (&rest names)
     (cl-find-if #'my/font-present-p names))
 
-  ;; Prefer TC for Han; prefer device-agnostic KR; map PUA to CMUO (family-only).
+  ;; Apply mappings after cnfonts sets the base fonts
   (defun my/apply-cjk-overrides (&rest _)
     (when (display-graphic-p)
+
       ;; 1) Han → Traditional Chinese
       (let* ((tc-fam (or
                       (my/first-present
@@ -61,12 +62,25 @@
           (set-fontset-font "fontset-default" 'hangul kr-fam nil 'prepend)
           (message "[cnfonts] hangul → %s" kr-fam)))
 
-      ;; 3) PUA → CMUO family name ONLY (no file fallback; CMU (non-O) is ignored)
-      (let ((pua-fam (cl-find-if (lambda (s) (string-match-p "CMUO" s))
-                                 (font-family-list))))
-        (when pua-fam
-          (set-fontset-font "fontset-default" '(#xE000 . #xF8FF) pua-fam nil 'prepend)
-          (message "[cnfonts] PUA → %s" pua-fam)))))
+      ;; 3) PUA → CMUO (mac: family or file; prefer TTF → OTF). Android: family-only.
+      (let* ((pua-range '(#xE000 . #xF8FF))
+             (fams (font-family-list))
+             (fam (or (cl-find-if (lambda (s) (string-match-p "\\bCMUO\\b" s)) fams)
+                      (cl-find-if (lambda (s) (string-match-p "\\bCMU\\b.*\\bSerif\\b" s)) fams))))
+        (cond
+         ;; If a CMUO/CMU Serif family is visible, use it.
+         (fam
+          (set-fontset-font "fontset-default" pua-range fam nil 'prepend)
+          (message "[cnfonts] PUA → family %s" fam))
+         ;; macOS only: fallback to repo file, prefer TTF then OTF
+         ((eq system-type 'darwin)
+          (let* ((try (list
+                       (expand-file-name "fonts/CMUOSerif-Roman.ttf" user-emacs-directory)
+                       (expand-file-name "fonts/CMUOSerif-Roman.otf" user-emacs-directory)))
+                 (file (cl-find-if #'file-readable-p try)))
+            (when file
+              (set-fontset-font "fontset-default" pua-range (font-spec :file file) nil 'prepend)
+              (message "[cnfonts] PUA → file %s" (file-name-nondirectory file)))))))))
 
   ;; Run after cnfonts has set its fonts, and once more at startup (helps Android timing)
   (with-eval-after-load 'cnfonts
