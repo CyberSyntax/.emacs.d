@@ -80,7 +80,7 @@ Returns the number of files copied."
               (when (my/android--newer-or-missing-p f out)
                 (condition-case e
                     (progn
-                      (copy-file f out t t t) ;; overwrite, preserve times/modes
+                      (copy-file f out t t nil)  ;; overwrite, preserve mtime, DO NOT preserve uid/gid
                       (cl-incf copied))
                   (error (unless quiet
                            (message "[fonts] copy failed %s -> %s: %s"
