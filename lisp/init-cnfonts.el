@@ -118,7 +118,7 @@
                         (lambda (orig &rest args)
                           (if (bound-and-true-p cnfonts-mode)
                               (ignore (message "[cnfonts] skipping %s" name))
-                            (apply orig args))))))))))
+                            (apply orig args)))))))))))
 
 ;; Quick diagnostic: which TC/KR families are visible
 (defun my/cjk-font-diag ()
