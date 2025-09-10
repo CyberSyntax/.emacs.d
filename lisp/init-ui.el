@@ -1,9 +1,9 @@
-;;; init-ui.el --- Cross-platform UI/font setup with Android diagnostics -*- lexical-binding: t; -*-
+;;; init-ui.el --- Cross-platform UI/font setup (Android: families only) -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 
 (defgroup init-ui nil
-  "Cross-platform UI/font setup and Android diagnostics."
+  "Cross-platform UI/font setup."
   :group 'faces
   :prefix "init-ui-")
 
@@ -20,11 +20,8 @@ Order:
 3) Else, if a staged file exists at ~/.emacs.d/fonts/FILENAME (non-Android), use that.
 On Android, return nil (file-based mapping is usually ignored by the text backend)."
   (cond
-   ;; Prefer an installed family if present
    ((and family (find-font (font-spec :family family))) family)
-   ;; Android: do not attempt :file mapping; only families from ~/fonts are reliable
    ((eq system-type 'android) nil)
-   ;; Non-Android: use shared file from repo if present
    (t
     (let* ((shared-file (expand-file-name (concat "fonts/" filename) user-emacs-directory))
            (internal-file (expand-file-name filename (expand-file-name "~/.emacs.d/fonts/"))))
@@ -43,6 +40,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
      (init-ui/log "Failed mapping %S → %S: %s" script-or-range font (error-message-string err)))))
 
 (defun init-ui/displayable-p (ch) (char-displayable-p ch))
+
 (defun init-ui/verify-mapping (label chars &optional fontset)
   (let ((results (mapcar (lambda (c) (list c (char-displayable-p c))) chars)))
     (init-ui/log "%s displayable? %S" label results)
@@ -58,7 +56,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
     (add-to-list 'default-frame-alist `(font . ,fontset))
     (init-ui/log "macOS fontset applied: base=Noto Serif-12; PUA=CMUO Serif; Han=Noto Serif TC")))
 
-;;;; Android probe/mapping (families only; :file mapping is generally ignored)
+;;;; Android: families only (no :file mapping)
 (when (and (fboundp 'set-fontset-font)
            (eq system-type 'android)
            (not (bound-and-true-p cnfonts-mode)))
@@ -134,7 +132,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
             (unless quiet (init-ui/log "Han mapped to %s" fam))
             fam)
         (unless quiet (init-ui/log "No Han-capable family visible to Emacs"))
-        nil))
+        nil)))
 
   (defun init-ui/android-apply-fonts ()
     (init-ui/log "Android font-backend: %S" (frame-parameter nil 'font-backend))
@@ -153,21 +151,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
     (let* ((re (regexp-opt '("One UI" "Noto" "Source" "CJK" "SEC" "Samsung" "Nanum")))
            (fams (cl-remove-if-not (lambda (s) (string-match-p re s)) (font-family-list))))
       (message "CJK-ish families: %S" fams)
-      fams))
-
-  (defun init-ui/preview-in-browser (&optional beg end)
-    (interactive)
-    (let* ((beg (or beg (if (use-region-p) (region-beginning) (point-min))))
-           (end (or end (if (use-region-p) (region-end) (point-max))))
-           (html (concat "<meta charset='utf-8'>"
-                         "<style>body{font-size:160%;line-height:1.6;} blockquote{margin-left:1em}</style>"
-                         "<body><blockquote>"
-                         (buffer-substring-no-properties beg end)
-                         "</blockquote></body>"))
-           (file (make-temp-file "han-preview" nil ".html")))
-      (with-temp-file file (insert html))
-      (browse-url-of-file file)
-      (init-ui/log "Opened preview in browser: %s" file)))
+      fams)))
 
 ;; Platform-agnostic UI tweaks
 (global-visual-line-mode 1)

@@ -2,7 +2,6 @@
 
 (require 'cl-lib)
 
-;; Loaded after init-vendor; cnfonts is on load-path if vendored.
 (when (and (display-graphic-p)
            (require 'cnfonts nil t))
 
@@ -11,14 +10,14 @@
   (global-set-key (kbd "C-M-+") #'cnfonts-increase-fontsize)
   (global-set-key (kbd "C-M-)") #'cnfonts-reset-fontsize)
 
-  ;; Minimal defaults; adjust names to match your (font-family-list)
-  ;; 1st list: ASCII, 2nd: CJK (prefer TC), 3rd/4th: optional (ExtB/Symbol)
+  ;; Personal font names
   (setq cnfonts-personal-fontnames
         '(("JetBrains Mono" "Fira Code" "Menlo" "Monaco" "Hack")
           ("Noto Serif TC" "Noto Serif CJK TC" "Noto Sans CJK TC"
            "Source Han Serif TC" "Source Han Sans TC"
            "Noto Serif CJK JP" "Noto Sans CJK JP")
           nil nil))
+
   (setq cnfonts-profiles '("program" "document")
         cnfonts-use-face-font-rescale t
         cnfonts-use-cache t)
@@ -31,7 +30,7 @@
   (defun my/first-present (&rest names)
     (cl-find-if #'my/font-present-p names))
 
-  ;; Apply mappings after cnfonts sets the base fonts
+  ;; Apply mappings after cnfonts base fonts
   (defun my/apply-cjk-overrides (&rest _)
     (when (display-graphic-p)
 
@@ -41,20 +40,19 @@
                        "Noto Serif TC" "Noto Serif CJK TC" "Noto Sans CJK TC"
                        "Source Han Serif TC" "Source Han Sans TC"
                        "PingFang TC" "Heiti TC" "Hiragino Sans CNS" "Hiragino Mincho ProN")
-                      ;; As a last resort on macOS, allow repo file (Android backend ignores :file for text)
                       (and (eq system-type 'darwin)
                            (let ((f (expand-file-name "fonts/NotoSerifTC-Regular.ttf" user-emacs-directory)))
                              (when (file-readable-p f) (font-spec :file f))))))
-             (han-ok nil))
+             (ok nil))
         (when tc-fam
           (set-fontset-font "fontset-default" 'han tc-fam nil 'prepend)
           (set-fontset-font "fontset-default" '(#x4E00 . #x9FFF) tc-fam nil 'prepend)
           (set-fontset-font "fontset-default" '(#x3400 . #x4DBF) tc-fam nil 'prepend)
-          (setq han-ok (char-displayable-p ?法))
+          (setq ok (char-displayable-p ?法))
           (message "[cnfonts] han → %s (法 displayable: %s)"
-                   (if (stringp tc-fam) tc-fam (plist-get (cdr tc-fam) :file)) han-ok)))
+                   (if (stringp tc-fam) tc-fam (plist-get (cdr tc-fam) :file)) ok)))
 
-      ;; 2) Hangul → Korean (prefer device-agnostic first, then Samsung)
+      ;; 2) Hangul → Korean
       (let ((kr-fam (my/first-present
                      "Noto Sans KR" "Noto Serif KR" "One UI Sans KR VF"
                      "SamsungOneKorean" "NanumGothic" "Roboto")))
@@ -62,22 +60,22 @@
           (set-fontset-font "fontset-default" 'hangul kr-fam nil 'prepend)
           (message "[cnfonts] hangul → %s" kr-fam)))
 
-      ;; 3) PUA → CMUO (mac: family or file; prefer TTF → OTF). Android: family-only.
+      ;; 3) PUA → CMUO (mac: family or file; Android: family-only)
       (let* ((pua-range '(#xE000 . #xF8FF))
              (fams (font-family-list))
              (fam (or (cl-find-if (lambda (s) (string-match-p "\\bCMUO\\b" s)) fams)
                       (cl-find-if (lambda (s) (string-match-p "\\bCMU\\b.*\\bSerif\\b" s)) fams))))
         (cond
-         ;; If a CMUO/CMU Serif family is visible, use it (both current and default), with 'replace to outrank others.
          (fam
+          ;; Highest precedence for PUA; map both current and default; disable symbol fallback on mac
           (set-fontset-font nil               pua-range fam nil 'replace)
           (set-fontset-font "fontset-default" pua-range fam nil 'replace)
           (when (eq system-type 'darwin)
             (setq use-default-font-for-symbols nil))
           (message "[cnfonts] PUA → family %s (replace)%s"
                    fam (if (eq system-type 'darwin) ", symbols=nil" "")))
-         ;; macOS only: fallback to repo file, prefer TTF then OTF (Android text backend ignores :file for PUA)
          ((eq system-type 'darwin)
+          ;; File fallback only on mac
           (let* ((try (list
                        (expand-file-name "fonts/CMUOSerif-Roman.ttf" user-emacs-directory)
                        (expand-file-name "fonts/CMUOSerif-Roman.otf" user-emacs-directory)))
@@ -89,18 +87,17 @@
               (message "[cnfonts] PUA → file %s (replace), symbols=nil"
                        (file-name-nondirectory file)))))))))
 
-  ;; Run after cnfonts has set its fonts, and once more at startup (helps Android timing)
+  ;; Run after cnfonts finishes, and once more at startup (Android timing)
   (with-eval-after-load 'cnfonts
     (add-hook 'cnfonts-set-font-finish-hook #'my/apply-cjk-overrides)
     (add-hook 'emacs-startup-hook (lambda () (run-with-timer 0.3 nil #'my/apply-cjk-overrides))))
 
-  ;; If cnfonts is active on Android, let it own font mapping (don't fight init-ui).
+  ;; Defer to cnfonts on Android (don't fight init-ui)
   (with-eval-after-load 'init-ui
     (when (eq system-type 'android)
       (dolist (fn '(init-ui/android-apply-fonts
                     init-ui/android-apply-hangul
-                    init-ui/android-apply-han
-                    init-ui/android-apply-pua))
+                    init-ui/android-apply-han))
         (when (fboundp fn)
           (advice-add fn :around
                       (let ((name (symbol-name fn)))
@@ -109,7 +106,7 @@
                               (ignore (message "[cnfonts] skipping %s" name))
                             (apply orig args))))))))))
 
-;; Quick diagnostic: which TC/KR/CMUO families are visible
+;; Quick diagnostic
 (defun my/cjk-font-diag ()
   "Show which TC/KR/CMUO families Emacs sees."
   (interactive)
