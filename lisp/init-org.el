@@ -26,7 +26,6 @@
   (setq org-return-follows-link t)
   (setq org-export-with-toc nil)
   (setq org-startup-folded 'content)
-  (setq org-ellipsis "⇣")
   ;; Disable backup files
   (setq make-backup-files nil)
   ;; Disable auto-save files
