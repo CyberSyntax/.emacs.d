@@ -42,12 +42,22 @@ First, grant Termux access to shared storage, then navigate to your `Documents` 
 
 ### Step 3: Local and private configuration
 
-**File:** `/data/data/com.termux/files/home/storage/shared/Documents/.emacs.d/lisp/init-local.el`
+File: /data/data/org.gnu.emacs/files/.emacs.d/early-init.el
 ```elisp
-;;; init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
+;;; internal early-init bootstrap -*- lexical-binding: t; -*-
+;; Redirect early-init to the shared repo, then run it.
 
-;; This file is for personal settings that should not be committed to Git.
+(setq user-emacs-directory "/storage/emulated/0/Documents/.emacs.d/")
 
-(provide 'init-local)
-;;; init-local.el ends here
+(load (expand-file-name "early-init.el" user-emacs-directory) nil 'nomessage)
+```
+
+File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
+```elisp
+;;; internal init bootstrap -*- lexical-binding: t; -*-
+;; Redirect init to the shared repo. Do NOT load early-init here (Emacs loads it first automatically).
+
+(setq user-emacs-directory "/storage/emulated/0/Documents/.emacs.d/")
+
+(load (expand-file-name "init.el" user-emacs-directory) nil 'nomessage)
 ```
