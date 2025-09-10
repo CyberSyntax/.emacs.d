@@ -24,7 +24,7 @@
 (defconst my-required-libraries
   '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
     "yasnippet" "org-web-tools" "transient"
-    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support")
+    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support" "cnfonts")
   "Libraries that must be locatable (ELPA or vendor).")
 
 (defun my-deps-all-present-p ()

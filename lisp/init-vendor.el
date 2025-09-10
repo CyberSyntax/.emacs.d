@@ -34,20 +34,22 @@
     ("CyberSyntax/org-story"                    . "org-story")
     ("CyberSyntax/hanja-reading"                . "hanja-reading")
     ("CyberSyntax/org-headline-manager"         . "org-headline-manager")
-    ("CyberSyntax/emacs-android-support-module" . "android-support-module")))
+    ("CyberSyntax/emacs-android-support-module" . "android-support-module")
+    ("tumashu/cnfonts"                          . "cnfonts")))
 
 (defvar my-vendor-branch-overrides
   '(("CyberSyntax/org-queue"                    . "main")
     ("CyberSyntax/org-story"                    . "main")
     ("CyberSyntax/hanja-reading"                . "main")
     ("CyberSyntax/org-headline-manager"         . "main")
-    ("CyberSyntax/emacs-android-support-module" . "main")))
+    ("CyberSyntax/emacs-android-support-module" . "main")
+    ("tumashu/cnfonts"                          . "master")))
 
 ;; This list is used only to decide when to write deps.done (all present).
 (defconst my-required-libraries
   '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
     "yasnippet" "org-web-tools" "transient"
-    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support"))
+    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support" "cnfonts"))
 
 ;; Helpers
 (defun my-vendor--ensure-dir (dir)

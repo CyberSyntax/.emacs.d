@@ -64,6 +64,7 @@ Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 
 ;; 3) Personal modules
 (require 'init-gptel)
+(require 'init-cnfonts)
 (require 'init-ui)
 (require 'init-org)
 (require 'init-android)
