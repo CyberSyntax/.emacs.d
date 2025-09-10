@@ -29,7 +29,7 @@ First, grant Termux access to shared storage, then navigate to your `Documents` 
 
 ### Step 2: Create the Native Emacs Bootstrap File
 
-**File:** `~/storage/shared/Documents/.emacs.d/init.el`
+**File:** `/data/data/org.gnu.emacs/files/.emacs.d/init.el`
 ```elisp
 ;;; Minimal Bootstrap for Native Android Emacs -*- lexical-binding: t; -*-
 ;;; This file redirects Emacs to the main configuration in shared storage.
@@ -42,7 +42,7 @@ First, grant Termux access to shared storage, then navigate to your `Documents` 
 
 ### Step 3: Local and private configuration
 
-**File:** `~/storage/shared/Documents/.emacs.d/lisp/init-local.el`
+**File:** `/data/data/com.termux/files/home/storage/shared/Documents/.emacs.d/lisp/init-local.el`
 ```elisp
 ;;; init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
 
