@@ -158,11 +158,12 @@ PRIORITY is ignored; kept for API clarity."
 ;; - xwidget-webkit not compiled in this build; browser fallback function provided below.
 
 (when (and (fboundp 'set-fontset-font)
-           (eq system-type 'android))
+           (eq system-type 'android)
+           (not (bound-and-true-p cnfonts-mode)))   ;; defer to cnfonts if active
 
   ;; User-tunable lists of candidate families to probe.
   (defcustom init-ui/android-hangul-candidates
-    '("One UI Sans KR VF" "Noto Sans KR" "SamsungOneKorean" "Roboto")
+    '("Noto Sans KR" "Noto Serif KR" "One UI Sans KR VF" "SamsungOneKorean" "NanumGothic" "Roboto")
     "Preferred Hangul families to probe on Android, in order."
     :type '(repeat string) :group 'init-ui)
 
@@ -263,7 +264,6 @@ PRIORITY is ignored; kept for API clarity."
 Guards against ordering issues where helpers might not be defined yet."
     (init-ui/log "Android font-backend: %S" (frame-parameter nil 'font-backend))
     ;; Always try to establish Hangul first (works on more devices).
-    ;; Guard with fboundp to prevent void-function errors during startup
     (when (fboundp 'init-ui/android-apply-hangul)
       (ignore-errors (init-ui/android-apply-hangul)))
     ;; Then try Han; logs if none found.
@@ -282,31 +282,12 @@ Guards against ordering issues where helpers might not be defined yet."
                 (when (fboundp 'init-ui/android-apply-han)
                   (ignore-errors (init-ui/android-apply-han t))))))
 
-  ;; Optional: attempt PUA mapping if (and only if) an installed family exists.
-  ;; CMUO Serif is common on desktop but rarely exported as a system Typeface on Android.
-  (defun init-ui/android-apply-pua ()
-    (let ((fam (car (cl-remove-if-not
-                     (lambda (s) (string-match-p "CMUO\\|CMU.*Serif\\|Symbol\\|Emoji" s))
-                     (font-family-list)))))
-      (when (and fam (find-font (font-spec :family fam)))
-        (init-ui/set-font-for nil '(#xE000 . #xF8FF) fam 'prepend)
-        (set-fontset-font "fontset-default" '(#xE000 . #xF8FF) fam nil 'prepend)
-        (init-ui/log "PUA tentatively mapped to %s (Android availability varies)" fam)
-        fam)))
-  
-  ;; We call it here for completeness, but it often won't do anything on Android:
-  ;; Guard this as well to be consistent
-  (add-hook 'emacs-startup-hook 
-            (lambda ()
-              (when (fboundp 'init-ui/android-apply-pua)
-                (ignore-errors (init-ui/android-apply-pua)))))
-
   ;; Diagnostics helpers (M-x friendly)
 
   (defun init-ui/android-show-cjk-candidates ()
     "Show families that look CJK-like to help manual testing."
     (interactive)
-    (let* ((re (regexp-opt '("One UI" "Noto" "Source" "CJK" "Chinese" "SEC")))
+    (let* ((re (regexp-opt '("One UI" "Noto" "Source" "CJK" "Chinese" "SEC" "Samsung" "Nanum")))
            (fams (cl-remove-if-not (lambda (s) (string-match-p re s)) (font-family-list))))
       (message "CJK-ish families: %S" fams)
       fams))
@@ -331,11 +312,9 @@ Guards against ordering issues where helpers might not be defined yet."
                    (cl-every #'char-displayable-p init-ui/android-han-probe-chars))
         (message "No Han-capable family visible to Emacs"))))
 
-  ;; In-Emacs browser preview (uses Android's browser fallback; no xwidgets required).
-  ;; Use this to read classical texts today if Han still doesn't render in the text backend.
+  ;; In-Emacs browser preview (uses Android's system fallback; no xwidgets required).
   (defun init-ui/preview-in-browser (&optional beg end)
-    "Preview the region (or whole buffer) in the default browser with UTF-8.
-This leverages Android's system font fallback to render Han correctly."
+    "Preview the region (or whole buffer) in the default browser with UTF-8."
     (interactive)
     (let* ((beg (or beg (if (use-region-p) (region-beginning) (point-min))))
            (end (or end (if (use-region-p) (region-end) (point-max))))
