@@ -29,19 +29,6 @@ First, grant Termux access to shared storage, then navigate to your `Documents` 
 
 ### Step 2: Create the Native Emacs Bootstrap File
 
-**File:** `/data/data/org.gnu.emacs/files/.emacs.d/init.el`
-```elisp
-;;; Minimal Bootstrap for Native Android Emacs -*- lexical-binding: t; -*-
-;;; This file redirects Emacs to the main configuration in shared storage.
-
-(setq user-emacs-directory "/storage/emulated/0/Documents/.emacs.d/")
-
-(load-file (expand-file-name "early-init.el" user-emacs-directory))
-(load-file (expand-file-name "init.el" user-emacs-directory))
-```
-
-### Step 3: Local and private configuration
-
 File: /data/data/org.gnu.emacs/files/.emacs.d/early-init.el
 ```elisp
 ;;; internal early-init bootstrap -*- lexical-binding: t; -*-
@@ -64,4 +51,16 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 (custom-set-variables
  '(package-selected-packages nil))
 (custom-set-faces)
+```
+
+### Step 3: Local and private configuration
+
+**File:** `/data/data/com.termux/files/home/storage/shared/Documents/.emacs.d/lisp/init-local.el`
+```elisp
+;;; init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
+
+;; This file is for personal settings that should not be committed to Git.
+
+(provide 'init-local)
+;;; init-local.el ends here
 ```
