@@ -55,9 +55,13 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/early-init.el
 File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 ```elisp
 ;;; internal init bootstrap -*- lexical-binding: t; -*-
-;; Redirect init to the shared repo. Do NOT load early-init here (Emacs loads it first automatically).
+;; Redirect init to the shared repo. Do NOT load early-init here.
 
 (setq user-emacs-directory "/storage/emulated/0/Documents/.emacs.d/")
 
 (load (expand-file-name "init.el" user-emacs-directory) nil 'nomessage)
+
+(custom-set-variables
+ '(package-selected-packages nil))
+(custom-set-faces)
 ```
