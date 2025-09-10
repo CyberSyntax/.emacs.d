@@ -56,38 +56,44 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/early-init.el
     (condition-case err
         (progn
           (make-directory dst t)
+          ;; Collect only font files (recursive), not directories.
           (cl-labels
               ((collect (dir)
                         (when (file-directory-p dir)
-                          (directory-files dir t "\\`[^.]\\|\\`\\.[^.]"
-                                           t)))
-               (copy-one (file)
-                         (when (and (file-regular-p file)
-                                    (member (downcase (file-name-extension file ""))
-                                            '("ttf" "otf" "ttc" "otc")))
-                           (let* ((out (expand-file-name (file-name-nondirectory file) dst)))
-                             (copy-file file out t t nil)
-                             1))))
-            (let ((list-src (collect src))
-                  (list-legacy (collect legacy))
-                  (copied 0))
-              (when list-src
-                ;; TTF first
-                (dolist (f list-src)
-                  (when (string-equal (downcase (file-name-extension f "")) "ttf")
-                    (cl-incf copied (or (copy-one f) 0))))
-                ;; Non-TTF after
-                (dolist (f list-src)
-                  (unless (string-equal (downcase (file-name-extension f "")) "ttf")
-                    (cl-incf copied (or (copy-one f) 0)))))
-              (when list-legacy
-                (dolist (f list-legacy)
-                  (cl-incf copied (or (copy-one f) 0))))
-              (my/int-log "pre-flight: copied %d file(s) to ~/fonts" copied)))
-          ;; Nudge registration
-          (ignore-errors (font-family-list)))
+                          (directory-files-recursively dir "\\.\\(ttf\\|otf\\|ttc\\|otc\\)\\'")))
+               (ext (f) (downcase (or (file-name-extension f) ""))))
+            (let* ((src-files    (collect src))
+                   (legacy-files (collect legacy))
+                   (all (append src-files legacy-files))
+                   (by-base (make-hash-table :test 'equal))
+                   (copied 0))
+              ;; Prefer TTF for the same basename.
+              (dolist (f all)
+                (let* ((base (file-name-base f))
+                       (e    (ext f))
+                       (cur  (gethash base by-base)))
+                  (cond
+                   ((string= e "ttf") (puthash base f by-base))      ;; TTF overrides any prior
+                   ((null cur)        (puthash base f by-base)))))    ;; first non-TTF wins if no TTF
+
+              ;; Copy resolved files
+              (maphash
+               (lambda (_base f)
+                 (let* ((out (expand-file-name (file-name-nondirectory f) dst)))
+                   (condition-case e2
+                       (progn
+                         ;; OK-IF-EXISTS=t, KEEP-TIME=t, PRESERVE-UID/GID=nil (Android-safe)
+                         (copy-file f out t t nil)
+                         (cl-incf copied))
+                     (error
+                      (my/int-log "copy failed %s -> %s: %s" f out (error-message-string e2))))))
+               by-base)
+
+              (my/int-log "pre-flight: copied %d file(s) to ~/fonts" copied))))
       (error
        (my/int-log "pre-flight copy failed: %s" (error-message-string err))))))
+;; Optional: nudge registration
+(ignore-errors (font-family-list))
 
 ;; Load the shared early-init now (repo takes over)
 (let ((shared (expand-file-name "early-init.el" user-emacs-directory)))
