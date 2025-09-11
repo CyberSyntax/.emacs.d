@@ -10,20 +10,14 @@
   (when (boundp 'gptel-include-reasoning)
     (setq gptel-include-reasoning 'include))
   :config
-  ;; We will let gptel use its default key-finding mechanism.
-  ;; - On PC, it will automatically find `~/.authinfo`.
-  ;; - On Android, it will use the `gptel-api-key` variable
-  ;;   which we set in `init-local.el`.
-  ;;
-
   ;; Main backend: OpenRouter Chat Completions
+  ;; By removing the :key parameter, this configuration trusts gptel's default
+  ;; mechanism, which correctly uses the Emacs-wide auth-source system.
   (setq my/gptel-openrouter
         (gptel-make-openai "OpenRouter"
           :host "openrouter.ai"
           :endpoint "/api/v1/chat/completions"
           :stream t
-          ;; By REMOVING the :key parameter, we tell gptel to use its default behavior.
-          ;; :key 'gptel-api-key
           :models '(openai/gpt-5
                     openai/gpt-5-mini
                     openai/gpt-oss-120b
@@ -40,8 +34,7 @@
           :request-params '(:reasoning (:effort "high"))))
 
   (setq gptel-backend my/gptel-openrouter
-        gptel-model  'openai/gpt-5)
-  )
+        gptel-model  'openai/gpt-5))
 
 ;; Custom command to start a new gptel chat without a prompt
 (defun my-gptel-new-chat ()

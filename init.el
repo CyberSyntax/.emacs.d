@@ -46,23 +46,21 @@ Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 (setq bookmark-default-file (expand-file-name "bookmarks" my-var-directory))
 
 ;; ===================================================================
-;; Load machine-specific settings EARLY (so env like GITHUB_TOKEN is set before init-vendor)
-;; ===================================================================
-
-(load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
-
-;; ===================================================================
 ;; Load Modules
 ;; ===================================================================
 
-;; 1) Package/bootstrap first (sets mirrors, ensures use-package, etc.)
+;; Package/bootstrap first (sets mirrors, ensures use-package, etc.)
 (require 'init-packages)
 
-;; 2) Vendor manager (GitHub repos). Then RUN it now so vendor libs are present.
+;; Vendor manager (GitHub repos). Then RUN it now so vendor libs are present.
 (require 'init-vendor)
 (my-vendor-autonomous-setup)
 
-;; 3) Personal modules
+
+;; Load machine-specific settings
+(load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
+
+;; Personal modules
 (require 'init-gptel)
 (require 'init-cnfonts)
 (require 'init-ui)
