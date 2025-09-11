@@ -147,14 +147,14 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 
 **File:** `/data/data/com.termux/files/home/storage/shared/Documents/.emacs.d/lisp/init-local.el`
 ```elisp
-;;; init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
+;;; lisp/init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
 
 ;; This file is for personal settings that should not be committed to Git.
+;; This version is optimized for Android.
 
-;; Define a function that returns the OpenRouter API key
-(defun my-openrouter-api-key ()
-  "Securely returns my OpenRouter API key."
-  "YOUR_API_KEY_HERE")
+;; Set the standard gptel-api-key variable directly.
+;; This is the officially recommended way by the gptel package.
+(setq gptel-api-key "YOUR_API_KEY_HERE")
 
 (provide 'init-local)
 ;;; init-local.el ends here

@@ -10,24 +10,11 @@
   (when (boundp 'gptel-include-reasoning)
     (setq gptel-include-reasoning 'include))
   :config
-  ;; Conditionally define the key function.
-  ;; If a function named 'my/openrouter-api-key' already exists
-  ;; (because it was loaded from init-local.el on Android),
-  ;; this definition will be skipped. Otherwise (on PC), it is defined here.
-  (unless (fboundp 'my/openrouter-api-key)
-    (defun my/openrouter-api-key ()
-      "Finds the key using .authinfo or env var for PC environments."
-      (or (getenv "OPENROUTER_API_KEY")
-          (ignore-errors
-            (let ((auth-sources '("~/.authinfo.gpg" "~/.authinfo")))
-              (gptel-api-key-from-auth-source "openrouter.ai")))
-          (user-error "OpenRouter key missing. Set OPENROUTER_API_KEY or add to ~/.authinfo(.gpg)"))))
-
-  ;; Optional referral headers (disabled by default).
-  ;; If you want them, uncomment both the defvar and :header line below.
-  ;; (defvar my/openrouter-headers
-  ;;   '(("HTTP-Referer" . "https://your.site")
-  ;;     ("X-Title"      . "Your Site Name")))
+  ;; We will let gptel use its default key-finding mechanism.
+  ;; - On PC, it will automatically find `~/.authinfo`.
+  ;; - On Android, it will use the `gptel-api-key` variable
+  ;;   which we set in `init-local.el`.
+  ;;
 
   ;; Main backend: OpenRouter Chat Completions
   (setq my/gptel-openrouter
@@ -35,8 +22,8 @@
           :host "openrouter.ai"
           :endpoint "/api/v1/chat/completions"
           :stream t
-          :key #'my/openrouter-api-key
-          ;; :header my/openrouter-headers        ;; uncomment if you set headers above
+          ;; By REMOVING the :key parameter, we tell gptel to use its default behavior.
+          ;; :key 'gptel-api-key
           :models '(openai/gpt-5
                     openai/gpt-5-mini
                     openai/gpt-oss-120b
@@ -50,11 +37,12 @@
             deepseek/deepseek-prover-v2
             deepseek/deepseek-v3.1-base
             deepseek/deepseek-chat-v3.1)
-          ;; High reasoning effort, no hard max_tokens cap from your side
           :request-params '(:reasoning (:effort "high"))))
 
   (setq gptel-backend my/gptel-openrouter
-        gptel-model  'openai/gpt-5))
+        gptel-model  'openai/gpt-5)
+  )
+
 ;; Custom command to start a new gptel chat without a prompt
 (defun my-gptel-new-chat ()
   "Start a new gptel session without the interactive buffer name prompt.
