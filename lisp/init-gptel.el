@@ -10,13 +10,18 @@
   (when (boundp 'gptel-include-reasoning)
     (setq gptel-include-reasoning 'include))
   :config
-  ;; Read OpenRouter key from env or authinfo
-  (defun my/openrouter-api-key ()
-    (or (getenv "OPENROUTER_API_KEY")
-        (ignore-errors
-          (let ((auth-sources '("~/.authinfo.gpg" "~/.authinfo")))
-            (gptel-api-key-from-auth-source "openrouter.ai")))
-        (user-error "OpenRouter key missing. Set OPENROUTER_API_KEY or add to ~/.authinfo(.gpg)")))
+  ;; Conditionally define the key function.
+  ;; If a function named 'my/openrouter-api-key' already exists
+  ;; (because it was loaded from init-local.el on Android),
+  ;; this definition will be skipped. Otherwise (on PC), it is defined here.
+  (unless (fboundp 'my/openrouter-api-key)
+    (defun my/openrouter-api-key ()
+      "Finds the key using .authinfo or env var for PC environments."
+      (or (getenv "OPENROUTER_API_KEY")
+          (ignore-errors
+            (let ((auth-sources '("~/.authinfo.gpg" "~/.authinfo")))
+              (gptel-api-key-from-auth-source "openrouter.ai")))
+          (user-error "OpenRouter key missing. Set OPENROUTER_API_KEY or add to ~/.authinfo(.gpg)"))))
 
   ;; Optional referral headers (disabled by default).
   ;; If you want them, uncomment both the defvar and :header line below.
@@ -50,7 +55,6 @@
 
   (setq gptel-backend my/gptel-openrouter
         gptel-model  'openai/gpt-5))
-
 ;; Custom command to start a new gptel chat without a prompt
 (defun my-gptel-new-chat ()
   "Start a new gptel session without the interactive buffer name prompt.

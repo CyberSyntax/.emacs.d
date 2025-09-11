@@ -151,6 +151,11 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 
 ;; This file is for personal settings that should not be committed to Git.
 
+;; Define a function that returns the OpenRouter API key
+(defun my-openrouter-api-key ()
+  "Securely returns my OpenRouter API key."
+  "YOUR_API_KEY_HERE")
+
 (provide 'init-local)
 ;;; init-local.el ends here
 ```
