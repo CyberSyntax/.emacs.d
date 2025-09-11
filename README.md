@@ -149,12 +149,7 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 ```elisp
 ;;; lisp/init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
 
-;; This file is for local, machine-specific settings that should not be committed to Git.
-;; It extends the standard Emacs authentication mechanism for this specific environment.
-
-;; Add our private, untracked authentication file to the list of sources
-;; that Emacs will check for credentials.
-(add-to-list 'auth-sources (expand-file-name ".authinfo" (user-emacs-directory load-file-name)))
+;; This file is for personal settings that should not be committed to Git.
 
 (provide 'init-local)
 ;;; init-local.el ends here
