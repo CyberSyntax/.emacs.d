@@ -154,13 +154,8 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 
 ;; Add our private, untracked authentication file to the list of sources
 ;; that Emacs will check for credentials.
-(add-to-list 'auth-sources (expand-file-name ".authinfo.local" (file-name-directory load-file-name)))
+(add-to-list 'auth-sources (expand-file-name ".authinfo" (user-emacs-directory load-file-name)))
 
 (provide 'init-local)
 ;;; init-local.el ends here
-```
-
-**File:** `/data/data/com.termux/files/home/storage/shared/Documents/.emacs.d/.authinfo.local`
-```
-machine openrouter.ai login apikey password YOUR_API_KEY_HERE
 ```

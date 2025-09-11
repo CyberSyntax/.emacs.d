@@ -33,7 +33,3 @@ dist/
 
 # OS-specific metadata
 .DS_Store
-
-# Private and Local Configuration Files (Do Not Commit)
-/lisp/init-local.el
-/.authinfo.local
