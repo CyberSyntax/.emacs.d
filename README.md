@@ -150,11 +150,18 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 ;;; lisp/init-local.el --- Local and private configuration -*- lexical-binding: t; -*-
 
 ;; This file is for personal settings that should not be committed to Git.
-;; This version is optimized for Android.
+;; This version is for Android.
 
-;; Set the standard gptel-api-key variable directly.
-;; This is the officially recommended way by the gptel package.
-(setq gptel-api-key "YOUR_API_KEY_HERE")
+;; First, explicitly load the 'auth-source' library so we can use its functions.
+(require 'auth-source)
+
+;; Now, programmatically add an entry to Emacs's authentication source list.
+;; This is the equivalent of adding a line to the ~/.authinfo file.
+(auth-source-put-entry
+ :machine "openrouter.ai"
+ :login "apikey"
+ :password "YOUR_API_KEY_HERE"
+ :port "https")
 
 (provide 'init-local)
 ;;; init-local.el ends here
