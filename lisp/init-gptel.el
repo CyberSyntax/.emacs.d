@@ -40,16 +40,47 @@
                     google/gemini-2.5-pro
                     google/gemini-2.5-flash
                     google/gemini-2.5-flash-lite
-		    deepseek/deepseek-r1-0528
-		    deepseek/deepseek-r1-0528-qwen3-8b
-		    deepseek/deepseek-prover-v2
-		    deepseek/deepseek-v3.1-base
-		    deepseek/deepseek-chat-v3.1)
+            deepseek/deepseek-r1-0528
+            deepseek/deepseek-r1-0528-qwen3-8b
+            deepseek/deepseek-prover-v2
+            deepseek/deepseek-v3.1-base
+            deepseek/deepseek-chat-v3.1)
           ;; High reasoning effort, no hard max_tokens cap from your side
           :request-params '(:reasoning (:effort "high"))))
 
   (setq gptel-backend my/gptel-openrouter
         gptel-model  'openai/gpt-5))
+
+;; Custom command to start a new gptel chat without a prompt
+(defun my-gptel-new-chat ()
+  "Start a new gptel session without the interactive buffer name prompt.
+This convenience function programmatically calls the original `gptel`
+command with an auto-generated, unique buffer name, allowing for an
+immediate chat session."
+  (interactive)
+  (let* (;; Get the current time with high precision (including microseconds) to ensure uniqueness.
+         (time (current-time))
+         (microseconds (nth 2 time))
+         ;; Create a unique buffer name using a timestamp format, e.g., "*gptel 20250911-223015.123456*".
+         ;; This prevents any naming conflicts, even when called multiple times in the same second.
+         (buffer-name (format "*gptel %s.%06d*"
+                              (format-time-string "%Y%m%d-%H%M%S")
+                              microseconds)))
+
+    ;; Programmatically invoke the original `gptel` function.
+    ;; We use `funcall` to explicitly pass all necessary arguments, matching `gptel`'s function signature:
+    ;; `(defun gptel (name &optional _ initial interactivep))`
+    (funcall #'gptel
+             buffer-name  ; 1. name: The unique buffer name we just created.
+             nil          ; 2. _: A placeholder for the second, unused optional argument.
+             nil          ; 3. initial: A placeholder for the initial text; we want an empty buffer.
+             t)))         ; 4. interactivep: The crucial argument. Setting this to `t` ensures that
+					;    `gptel` will call `display-buffer` to actually show the buffer to the user
+					;    after creating it. Without this, the buffer is created silently.
+
+;; Assign our new, convenient command to the global keybinding "C-c C-g".
+;; This replaces the standard workflow of `M-x gptel` followed by typing a buffer name.
+(global-set-key (kbd "C-c C-g") #'my-gptel-new-chat)
 
 (provide 'init-gptel)
 
