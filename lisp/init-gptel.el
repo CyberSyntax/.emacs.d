@@ -40,13 +40,16 @@
                     google/gemini-2.5-pro
                     google/gemini-2.5-flash
                     google/gemini-2.5-flash-lite
-            deepseek/deepseek-r1-0528
-            deepseek/deepseek-r1-0528-qwen3-8b
-            deepseek/deepseek-prover-v2
-            deepseek/deepseek-v3.1-base
-            deepseek/deepseek-chat-v3.1)
+		    deepseek/deepseek-r1-0528
+		    deepseek/deepseek-r1-0528-qwen3-8b
+		    deepseek/deepseek-prover-v2
+		    deepseek/deepseek-v3.1-base
+		    deepseek/deepseek-chat-v3.1)
           ;; High reasoning effort, no hard max_tokens cap from your side
           :request-params '(:reasoning (:effort "high"))))
+
+  (setq gptel-backend my/gptel-openrouter
+        gptel-model  'openai/gpt-5))
 
 ;; Custom command to start a new gptel chat without a prompt
 (defun my-gptel-new-chat ()
