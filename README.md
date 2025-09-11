@@ -1,3 +1,15 @@
+# Emacs Configuration
+
+## General Setup
+
+1.  In Emacs, create the file `~/.authinfo` by pressing `C-x C-f`, typing the path, and adding the following line:
+
+    ```
+    machine openrouter.ai login apikey password YOUR_API_KEY_HERE
+    ```
+    *(Replace `YOUR_API_KEY_HERE` with your actual key.)*
+
+
 ## Setup for Native Android Emacs
 
 This guide outlines the essential steps to make the Native Android Emacs app use this configuration, which is managed via Git inside Termux.
