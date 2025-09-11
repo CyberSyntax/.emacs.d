@@ -159,3 +159,8 @@ File: /data/data/org.gnu.emacs/files/.emacs.d/init.el
 (provide 'init-local)
 ;;; init-local.el ends here
 ```
+
+**File:** `/data/data/com.termux/files/home/storage/shared/Documents/.emacs.d/.authinfo.local`
+```
+machine openrouter.ai login apikey password YOUR_API_KEY_HERE
+```
