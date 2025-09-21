@@ -3,8 +3,8 @@
 (defconst my-required-libraries
   '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
     "yasnippet" "org-web-tools" "transient" "gt"
-    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support" "cnfonts")
-  "Libraries that must be locatable (ELPA or vendor).")
+    "org-queue" "org-story" "hanja-reading" "org-headline-manager"
+    "android-support" "cnfonts" "anki-editor"))
 
 (defconst my-deps-record-file
   (expand-file-name "var/deps.done" user-emacs-directory)

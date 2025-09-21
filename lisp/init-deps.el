@@ -9,12 +9,14 @@
 (defun my-deps-install-if-needed ()
   "If deps are not yet complete, install only the missing ones and record completion."
   (unless my-deps-complete
-    ;; 1) Install missing ELPA packages only.
-    (require 'init-packages)  ;; uses guard to avoid heavy work if not needed
-    (let ((pkgs '(use-package gptel org org-roam org-roam-ui fsrs org-srs yasnippet org-web-tools transient)))
-      (dolist (p pkgs)
-        (unless (locate-library (symbol-name p))
-          (ignore-errors (package-install p)))))
+    ;; 1) Install missing ELPA packages only, derived from `my-required-libraries`.
+    (require 'init-packages)  ;; handles package init, mirrors, stubs, etc.
+    (dolist (entry my-required-libraries)
+      (let* ((lib (if (symbolp entry) (symbol-name entry) entry))
+             (pkg (intern lib)))
+        (unless (locate-library lib)
+          ;; Try to install from ELPA; vendor-only libs will just error out (ignored).
+          (ignore-errors (package-install pkg)))))
 
     ;; 2) Install missing vendor repos only (no updates of those already present).
     (require 'init-vendor)
