@@ -27,7 +27,7 @@ If nil, fall back to \"Basic\"."
   ;; Set your repo defaults here.
   (setq my/anki-editor-default-note-type "Bilingual Cloze"
         my/anki-editor-default-deck
-        "Articulation/Assimilation::Translation::DeepL Translator::Fleeting Items")
+        "Root::Neural Pathways")
   :config
   ;; Helpers
   (defun my/anki--default-deck ()
