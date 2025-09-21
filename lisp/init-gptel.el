@@ -11,12 +11,11 @@
     (setq gptel-include-reasoning 'include))
   :config
   ;; Read OpenRouter key from env or authinfo
-  (defun my/openrouter-api-key ()
-    (or (getenv "OPENROUTER_API_KEY")
-        (ignore-errors
-          (let ((auth-sources '("~/.authinfo.gpg" "~/.authinfo")))
-            (gptel-api-key-from-auth-source "openrouter.ai")))
-        (user-error "OpenRouter key missing. Set OPENROUTER_API_KEY or add to ~/.authinfo(.gpg)")))
+;; Read OpenRouter key from env or authinfo
+(defun my/openrouter-api-key ()
+  (or (getenv "OPENROUTER_API_KEY")
+      (my-authinfo-get-password "openrouter.ai" "apikey")
+      (user-error "OpenRouter key missing. Set OPENROUTER_API_KEY or add to ~/.authinfo(.gpg)")))
 
   ;; Optional referral headers (disabled by default).
   ;; If you want them, uncomment both the defvar and :header line below.

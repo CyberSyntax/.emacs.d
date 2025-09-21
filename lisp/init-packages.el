@@ -6,20 +6,6 @@
 (require 'url-parse)
 (require 'package)
 
-;; Global completion record: when present, all dependency work must be skipped.
-(defconst my-deps-record-file
-  (expand-file-name "var/deps.done" user-emacs-directory)
-  "If this file exists and contains \"ok\", dependency setup is considered complete.")
-
-(defvar my-deps-complete
-  (and (file-exists-p my-deps-record-file)
-       (ignore-errors
-         (with-temp-buffer
-           (insert-file-contents my-deps-record-file)
-           (goto-char (point-min))
-           (re-search-forward "\\bok\\b" nil t))))
-  "Non-nil means all dependencies were previously installed; skip installs and refreshes.")
-
 ;; Core behavior and directories
 (setq byte-compile-warnings '(not free-vars obsolete))
 (setq load-prefer-newer t)

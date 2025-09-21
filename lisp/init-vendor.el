@@ -5,23 +5,6 @@
 (require 'url)
 (require 'url-parse)
 
-;; Completion record: if present with "ok", skip all vendor work except load-path.
-(defconst my-deps-record-file
-  (expand-file-name "var/deps.done" user-emacs-directory))
-(defvar my-deps-complete
-  (and (file-exists-p my-deps-record-file)
-       (ignore-errors
-         (with-temp-buffer
-           (insert-file-contents my-deps-record-file)
-           (goto-char (point-min))
-           (re-search-forward "\\bok\\b" nil t)))))
-
-(defun my-deps--record-success ()
-  (make-directory (file-name-directory my-deps-record-file) t)
-  (with-temp-file my-deps-record-file
-    (insert "ok\n"))
-  (setq my-deps-complete t))
-
 ;; Vendor config
 (defvar my-vendor-directory
   (expand-file-name "lisp/vendor" user-emacs-directory))
@@ -44,12 +27,6 @@
     ("CyberSyntax/org-headline-manager"         . "main")
     ("CyberSyntax/emacs-android-support-module" . "main")
     ("tumashu/cnfonts"                          . "master")))
-
-;; This list is used only to decide when to write deps.done (all present).
-(defconst my-required-libraries
-  '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
-    "yasnippet" "org-web-tools" "transient"
-    "org-queue" "org-story" "hanja-reading" "org-headline-manager" "android-support" "cnfonts"))
 
 ;; Helpers
 (defun my-vendor--ensure-dir (dir)

@@ -6,6 +6,7 @@
 
     ```
     machine openrouter.ai login apikey password YOUR_API_KEY_HERE
+    machine api.deepl.com login apikey password YOUR_DEEPL_KEY
     ```
     *(Replace `YOUR_API_KEY_HERE` with your actual key.)*
 

@@ -56,6 +56,8 @@ Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 (require 'init-vendor)
 (my-vendor-autonomous-setup)
 
+;; Load authinfo support early (before modules that need it)
+(require 'init-authinfo)
 
 ;; Load machine-specific settings
 (load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
