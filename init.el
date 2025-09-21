@@ -67,6 +67,7 @@ Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 (require 'init-cnfonts)
 (require 'init-ui)
 (require 'init-org)
+(require 'init-gt)
 (require 'init-android)
 
 ;; ===================================================================
