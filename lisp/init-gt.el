@@ -2,6 +2,9 @@
 
 (require 'cl-lib)
 
+;; Send no extra DeepL params (let DeepL defaults apply).
+(setq gt-deepl-extra-params nil)
+
 (use-package gt
   :ensure t
   :config
