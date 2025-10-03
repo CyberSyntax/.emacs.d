@@ -4,7 +4,13 @@
 ;; Initial Setup
 ;; ===================================================================
 
+;; Keep all modules under ./lisp on the load-path
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+
+;; Ensure any future Customize output never pollutes this file
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+  (load custom-file :noerror :nomessage))
 
 (require 'init-deps)
 ;; If not yet complete, perform the one-time installs now.
@@ -31,18 +37,28 @@
 (set-language-environment "UTF-8")
 (prefer-coding-system 'utf-8)
 (set-default-coding-systems 'utf-8)
+
 (setq debug-on-error t)
 (setq completion-styles '(substring partial-completion flex))
 
+;; Root directory for Org files (Android vs. others)
 (defvar org-agenda-directory
   (if (eq system-type 'android)
       "/storage/emulated/0/Documents/org"
-    ;; on macOS/Linux/Windows:
+    ;; macOS/Linux/Windows:
     (expand-file-name "Documents/org" (getenv "HOME")))
-  "Directory containing org agenda files.
-Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
+  "Directory containing all Org files.")
+
+;; Build org-agenda-files programmatically (no Customize, no giant literal list)
+(setq org-agenda-files
+      (when (file-directory-p org-agenda-directory)
+        (directory-files-recursively org-agenda-directory "\\.org\\'")))
+
+;; Cache directory used by various modules (e.g., org-queue)
 (setq cache-dir (expand-file-name "cache/" my-var-directory))
 (unless (file-directory-p cache-dir) (make-directory cache-dir t))
+
+;; Keep bookmarks under var/
 (setq bookmark-default-file (expand-file-name "bookmarks" my-var-directory))
 
 ;; ===================================================================
@@ -59,7 +75,7 @@ Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 ;; Load authinfo support early (before modules that need it)
 (require 'init-authinfo)
 
-;; Load machine-specific settings
+;; Load machine-specific settings (optional, ignored if not present)
 (load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
 
 ;; Personal modules
@@ -77,7 +93,7 @@ Uses Android-specific path on Android systems, ~/Documents/org elsewhere.")
 ;; ===================================================================
 
 (defun require-if-available (feature &optional filename)
-  "Require FEATURE if its library is found, else just log and return nil.
+  "Require FEATURE if its library is found; else log and return nil.
 FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name to locate."
   (let* ((feat (cond
                 ((symbolp feature) feature)
@@ -91,6 +107,10 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 
 (require-if-available 'org-headline-manager)
 (require-if-available 'hanja-reading)
+
+;; org-queue uses the same root as my agenda; set this BEFORE loading org-queue
+(setq org-queue-directory org-agenda-directory)
+
 (require-if-available 'org-queue)
 (require-if-available 'org-story)
 
@@ -99,18 +119,5 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 ;; ===================================================================
 
 (message "Emacs configuration successfully loaded.")
-
-(custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(package-selected-packages nil))
-(custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- )
 
 ;;; init.el ends here
