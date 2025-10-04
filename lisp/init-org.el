@@ -186,17 +186,18 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
 (use-package org-roam
   :ensure t
   :init
-  ;; Keep Roam files with your agenda files
   (setq org-roam-directory org-agenda-directory)
-  ;; Put the DB in your cache dir
   (setq org-roam-db-location (expand-file-name "org-roam.db" cache-dir))
-  ;; Use Emacs 29+ builtin SQLite if available; else fallback (you won’t hit this on Android if sqlite-available-p is t)
   (setq org-roam-database-connector (if (sqlite-available-p) 'sqlite 'sqlite3))
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert))
   :config
   (org-roam-db-autosync-mode 1)
+  ;; Don’t let org-roam warnings pop the *Warnings* window
+  (if (boundp 'warning-suppress-log-types)
+      (add-to-list 'warning-suppress-log-types '(org-roam))  ; keep echo-area, no *Warnings*
+    (add-to-list 'warning-suppress-types '(org-roam)))       ; older Emacs: fully suppress
   )
 
 (use-package org-roam-ui
