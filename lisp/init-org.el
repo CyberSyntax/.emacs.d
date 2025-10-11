@@ -193,7 +193,6 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
          ("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert))
   :config
-  (org-roam-db-autosync-mode 1)
   ;; Don’t let org-roam warnings pop the *Warnings* window
   (if (boundp 'warning-suppress-log-types)
       (add-to-list 'warning-suppress-log-types '(org-roam))  ; keep echo-area, no *Warnings*
