@@ -112,6 +112,11 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 (setq org-queue-directory org-agenda-directory)
 
 (require-if-available 'org-queue)
+
+;; Override org-queue night shift to start at midnight (00:00)
+(setq org-queue-night-shift-start "00:00"
+      org-queue-night-shift-end "06:00")
+
 (require-if-available 'org-story)
 
 ;; ===================================================================
