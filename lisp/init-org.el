@@ -44,9 +44,15 @@
                  :message "you need to install the programs: latex and dvisvgm."
                  :image-input-type "dvi"
                  :image-output-type "svg"
-                 :image-size-adjust (1.0 . 1.0)
+                 :image-size-adjust (1.6 . 1.6)
                  :latex-compiler ("latex -interaction nonstopmode -output-directory %o %f")
                  :image-converter ("dvisvgm %f -n -b min -c %S -o %O"))))
+
+;; Make Org scale the inline previews larger, too
+(setq org-format-latex-options
+      (plist-put org-format-latex-options :scale 1.8))
+(setq org-format-latex-options
+      (plist-put org-format-latex-options :html-scale 1.8))
 
 ;; Customize the LaTeX header for rendering TikZ and pgfplots
 (setq org-format-latex-header
