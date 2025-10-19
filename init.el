@@ -117,6 +117,8 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 (setq org-queue-night-shift-start "00:00"
       org-queue-night-shift-end "06:00")
 
+(setq org-queue-srs-mix-ratio '(1 . 16))
+
 ;;; --- org-queue × org-capture: minimal interop ---
 
 (with-eval-after-load 'org-queue-tasks
