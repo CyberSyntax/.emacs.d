@@ -117,6 +117,39 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 (setq org-queue-night-shift-start "00:00"
       org-queue-night-shift-end "06:00")
 
+;;; --- org-queue × org-capture: minimal interop ---
+
+(with-eval-after-load 'org-queue-tasks
+  ;; Is any Org-capture buffer active right now?
+  (defun my/capture-active-p ()
+    (catch 'yes
+      (dolist (b (buffer-list))
+        (when (buffer-live-p b)
+          (with-current-buffer b
+            (when (bound-and-true-p org-capture-mode)
+              (throw 'yes t)))))
+      nil))
+
+  ;; 1) Don't steal focus while capturing (avoids replacing the capture window).
+  (defun my/oq-skip-show-top-during-capture (orig &rest args)
+    (if (my/capture-active-p)
+        (message "org-queue: capture active; skipping show-top")
+      (apply orig args)))
+  (advice-add 'org-queue-show-top :around #'my/oq-skip-show-top-during-capture)
+
+  ;; 2) Don't bury capture buffers when trimming visible buffers.
+  (defun my/oq-dont-bury-capture (orig &rest args)
+    (if (my/capture-active-p)
+        (let ((orig-bury (symbol-function 'bury-buffer)))
+          (cl-letf (((symbol-function 'bury-buffer)
+                     (lambda (&optional buffer-or-name)
+                       (with-current-buffer (get-buffer (or buffer-or-name (current-buffer)))
+                         (unless (bound-and-true-p org-capture-mode)
+                           (funcall orig-bury buffer-or-name))))))
+            (apply orig args)))
+      (apply orig args)))
+  (advice-add 'my-queue-limit-visible-buffers :around #'my/oq-dont-bury-capture))
+
 (require-if-available 'org-story)
 
 ;; ===================================================================
