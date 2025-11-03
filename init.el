@@ -88,6 +88,7 @@
 (require 'init-gt)
 (require 'init-android)
 (require 'init-flycheck)
+(require 'init-grammarly)
 
 ;; ===================================================================
 ;; Load Vendor Packages (optional; only if present)
