@@ -4,7 +4,7 @@
   '("gptel" "org" "org-roam" "org-roam-ui" "fsrs" "org-srs"
     "yasnippet" "org-web-tools" "transient" "gt"
     "org-queue" "org-story" "hanja-reading" "org-headline-manager"
-    "android-support" "cnfonts" "anki-editor"))
+    "android-support" "cnfonts" "anki-editor" "flycheck"))
 
 (defconst my-deps-record-file
   (expand-file-name "var/deps.done" user-emacs-directory)

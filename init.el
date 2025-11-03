@@ -87,6 +87,7 @@
 (require 'init-anki-editor)
 (require 'init-gt)
 (require 'init-android)
+(require 'init-flycheck)
 
 ;; ===================================================================
 ;; Load Vendor Packages (optional; only if present)
