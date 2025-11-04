@@ -222,7 +222,7 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
   ;; This code runs BEFORE fsrs is loaded.
   ;; This is the correct place to set configuration variables.
   (setq my-fsrs-weights
-        [0.2187 2.1756 10.7365 41.8256 7.1638 0.5166 2.2582 0.0015 1.2522 0.1048 0.8643 1.8184 0.1412 0.2909 2.3755 0.2315 2.9898 0.3743 0.6460]))
+        [0.1328, 1.8668, 11.7173, 56.0247, 6.7091, 0.8260, 2.6668, 0.0010, 1.5693, 0.1708, 0.6159, 1.3165, 0.0831, 0.4285, 1.1685, 0.6014, 1.8729, 0.8229, 0.2622, 0.1653, 0.4227]))
 
 ;; Configure Org-SRS, ensuring it loads after FSRS
 (use-package org-srs
