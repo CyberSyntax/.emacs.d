@@ -72,13 +72,14 @@
 (require 'init-vendor)
 (my-vendor-autonomous-setup)
 
-;; Load authinfo support early (before modules that need it)
-(require 'init-authinfo)
-
 ;; Load machine-specific settings (optional, ignored if not present)
 (load (expand-file-name "lisp/init-local.el" user-emacs-directory) 'noerror)
 
+;; Load authinfo support early (before modules that need it)
+(require 'init-authinfo)
+
 ;; Personal modules
+(require 'init-deepl-write)
 (require 'init-gptel)
 (require 'init-cnfonts)
 (require 'init-ui)
