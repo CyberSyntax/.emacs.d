@@ -31,9 +31,7 @@
           :stream t
           :key #'my/openrouter-api-key
           ;; :header my/openrouter-headers        ;; uncomment if you set headers above
-          :models '(openai/gpt-5
-                    openai/gpt-5-pro
-                    openai/gpt-5-mini
+          :models '(openai/gpt-5-1
                     openai/gpt-oss-120b
                     anthropic/claude-opus-4.1
                     anthropic/claude-sonnet-4
