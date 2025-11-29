@@ -44,9 +44,9 @@
 ;; Root directory for Org files (Android vs. others)
 (defvar org-agenda-directory
   (if (eq system-type 'android)
-      "/storage/emulated/0/Documents/org"
+      "/storage/emulated/0/Documents/org-queue"
     ;; macOS/Linux/Windows:
-    (expand-file-name "Documents/org" (getenv "HOME")))
+    (expand-file-name "Documents/org-queue" (getenv "HOME")))
   "Directory containing all Org files.")
 
 ;; Build org-agenda-files programmatically (no Customize, no giant literal list)
