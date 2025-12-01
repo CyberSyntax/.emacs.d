@@ -111,7 +111,10 @@ FEATURE may be a symbol or a string. FILENAME, if non-nil, is the library name t
 (require-if-available 'hanja-reading)
 
 ;; org-queue uses the same root as my agenda; set this BEFORE loading org-queue
-(setq org-queue-directory org-agenda-directory)
+(setq org-queue-directory org-agenda-directory
+      ;; Put the maintenance stamp next to my Org files, not in var/
+      org-queue-maintenance-stamp-file
+      (expand-file-name ".org-queue-maintenance.stamp" org-queue-directory))
 
 (require-if-available 'org-queue)
 
