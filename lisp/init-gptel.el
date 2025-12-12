@@ -31,23 +31,17 @@
           :stream t
           :key #'my/openrouter-api-key
           ;; :header my/openrouter-headers        ;; uncomment if you set headers above
-          :models '(openai/gpt-5-1
-                    openai/gpt-oss-120b
-                    anthropic/claude-opus-4.1
-                    anthropic/claude-sonnet-4
-                    google/gemini-2.5-pro
-                    google/gemini-2.5-flash
-                    google/gemini-2.5-flash-lite
-                    deepseek/deepseek-r1-0528
-                    deepseek/deepseek-r1-0528-qwen3-8b
-                    deepseek/deepseek-prover-v2
-                    deepseek/deepseek-v3.1-base
-                    deepseek/deepseek-chat-v3.1)
+          :models '(openai/gpt-5.2
+                    openai/gpt-5.2-pro
+                    anthropic/claude-opus-4.5
+                    anthropic/claude-sonnet-4.5
+                    google/gemini-3-pro-preview
+                    google/gemini-2.5-flash)
           ;; High reasoning effort, no hard max_tokens cap from your side
-          :request-params '(:reasoning (:effort "high"))))
+          :request-params '(:reasoning (:effort "xhigh"))))
 
   (setq gptel-backend my/gptel-openrouter
-        gptel-model  'openai/gpt-5))
+        gptel-model  'openai/gpt-5.2))
 
 ;; Custom command to start a new gptel chat without a prompt
 (defun my-gptel-new-chat ()
