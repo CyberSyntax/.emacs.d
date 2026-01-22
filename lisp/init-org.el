@@ -235,6 +235,36 @@ paths using `org-agenda-directory` and update `org-agenda-files` accordingly."
   ;; Configuration that runs AFTER org-srs is loaded can go here.
   (require 'org-srs)) ;; Explicitly require to be safe
 
+;; -------------------------------
+;; Org Content Cleaning for LLM
+;; -------------------------------
+
+(defun my-org-clean-for-llm (content)
+  "Clean org CONTENT for LLM consumption.
+Removes PROPERTIES blocks, SCHEDULED/DEADLINE lines, priorities,
+timestamps, and tags while preserving the actual content."
+  (let ((in-properties nil)
+        (lines (split-string content "\n"))
+        result)
+    (dolist (line lines)
+      (cond
+       ((string-match "^:PROPERTIES:" line) (setq in-properties t))
+       ((string-match "^:END:" line) (setq in-properties nil))
+       ((not in-properties)
+        (unless (or (string-match "^SCHEDULED:" line)
+                    (string-match "^DEADLINE:" line)
+                    (string-match "^#\\+title:" line))
+          (setq line (replace-regexp-in-string "\\[#[0-9A-Z]+\\][ \t]*" "" line))
+          (setq line (replace-regexp-in-string "\\[[0-9]+-[0-9]+-[0-9]+ [A-Za-z]+ [0-9:]+\\]" "" line))
+          (setq line (replace-regexp-in-string "[ \t]+:[a-zA-Z0-9_@:]+:[ \t]*$" "" line))
+          (push line result)))))
+    (string-join (nreverse result) "\n")))
+
+(defun my-org-clean-buffer-for-llm ()
+  "Clean current org buffer for LLM and return as string."
+  (interactive)
+  (my-org-clean-for-llm (buffer-string)))
+
 (provide 'init-org)
 
 ;;; lisp/init-org.el ends here
