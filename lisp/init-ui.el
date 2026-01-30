@@ -46,15 +46,30 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
     (init-ui/log "%s displayable? %S" label results)
     results))
 
-;;;; macOS (preserve existing, known-good setup)
-(when (and (fboundp 'set-fontset-font)
-           (eq system-type 'darwin)
-           (not (bound-and-true-p cnfonts-mode)))
-  (let ((fontset (create-fontset-from-ascii-font "Noto Serif-12")))
-    (init-ui/set-font-for fontset '(#xE000 . #xF8FF) "CMUO Serif" 'prepend)
-    (init-ui/set-font-for fontset 'han "Noto Serif TC" 'prepend)
-    (add-to-list 'default-frame-alist `(font . ,fontset))
-    (init-ui/log "macOS fontset applied: base=Noto Serif-12; PUA=CMUO Serif; Han=Noto Serif TC")))
+;;;; macOS GUI font setup (requires window system)
+(defun init-ui/macos-setup-fonts ()
+  "Configure macOS fonts. Only works in GUI mode."
+  (when (and (display-graphic-p)
+             (fboundp 'set-fontset-font)
+             (eq system-type 'darwin)
+             (not (bound-and-true-p cnfonts-mode)))
+    (condition-case err
+        (let ((fontset (create-fontset-from-ascii-font "Noto Serif-12")))
+          (init-ui/set-font-for fontset '(#xE000 . #xF8FF) "CMUO Serif" 'prepend)
+          (init-ui/set-font-for fontset 'han "Noto Serif TC" 'prepend)
+          (add-to-list 'default-frame-alist `(font . ,fontset))
+          (init-ui/log "macOS fontset applied: base=Noto Serif-12; PUA=CMUO Serif; Han=Noto Serif TC"))
+      (error
+       (init-ui/log "macOS font setup failed: %s" (error-message-string err))))))
+
+;; Apply macOS fonts: immediately if GUI, or defer to frame creation
+(if (display-graphic-p)
+    (init-ui/macos-setup-fonts)
+  (add-hook 'after-make-frame-functions
+            (lambda (frame)
+              (when (display-graphic-p frame)
+                (with-selected-frame frame
+                  (init-ui/macos-setup-fonts))))))
 
 ;;;; Android: families only (no :file mapping)
 (when (and (fboundp 'set-fontset-font)
@@ -113,7 +128,7 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
             (add-hook 'after-make-frame-functions
                       (lambda (f)
                         (with-selected-frame f
-                          (ignore-errors (set-fontset-font nil 'hangul fam nil 'prepend))))))
+                          (ignore-errors (set-fontset-font nil 'hangul fam nil 'prepend)))))
             (unless quiet (init-ui/log "Hangul mapped to %s" fam))
             fam)
         (unless quiet (init-ui/log "No working Hangul family found"))
@@ -128,11 +143,11 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
             (add-hook 'after-make-frame-functions
                       (lambda (f)
                         (with-selected-frame f
-                          (ignore-errors (set-fontset-font nil 'han fam nil 'prepend))))))
+                          (ignore-errors (set-fontset-font nil 'han fam nil 'prepend)))))
             (unless quiet (init-ui/log "Han mapped to %s" fam))
             fam)
         (unless quiet (init-ui/log "No Han-capable family visible to Emacs"))
-        nil))
+        nil)))
 
   (defun init-ui/android-apply-fonts ()
     (init-ui/log "Android font-backend: %S" (frame-parameter nil 'font-backend))
@@ -151,7 +166,24 @@ On Android, return nil (file-based mapping is usually ignored by the text backen
     (let* ((re (regexp-opt '("One UI" "Noto" "Source" "CJK" "SEC" "Samsung" "Nanum")))
            (fams (cl-remove-if-not (lambda (s) (string-match-p re s)) (font-family-list))))
       (message "CJK-ish families: %S" fams)
-      fams))
+      fams)))  ; Close Android when-block
+
+;;;; Terminal-specific UI enhancements
+(unless (display-graphic-p)
+  (init-ui/log "Terminal mode detected - applying terminal-specific settings")
+
+  ;; Enable xterm mouse support
+  (when (and (not (display-graphic-p))
+             (getenv "DISPLAY"))
+    (xterm-mouse-mode 1)
+    (init-ui/log "xterm-mouse-mode enabled"))
+
+  ;; Better colors in terminal (if supported)
+  (when (>= (length (tty-color-alist)) 256)
+    (init-ui/log "256+ color terminal detected"))
+
+  ;; Menu bar is less useful in terminal
+  (menu-bar-mode -1))
 
 ;; Platform-agnostic UI tweaks
 (global-visual-line-mode 1)
